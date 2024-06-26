@@ -1,2 +1,9 @@
 /shelf/
 /workspace.xml
+__pycache__/
+*.root
+*.csv
+*.jpg
+*.jpeg
+*.png
+*.gif
