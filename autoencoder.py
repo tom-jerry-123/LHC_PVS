@@ -1,0 +1,99 @@
+"""
+File for Autoencoder class. Creates simple autoencoder
+"""
+
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+
+class Autoencoder:
+    def __init__(self, input_dim=10, code_dim=3, architecture=(8,)):
+        # Define the input layer
+        self._input_layer = tf.keras.layers.Input(shape=(input_dim,))
+
+        # Define the encoder layers
+        prev = self._input_layer
+        cur = None
+        for num in architecture:
+            cur = tf.keras.layers.Dense(num, activation=tf.keras.layers.LeakyReLU(alpha=0.01))(prev)
+            prev = cur
+        # encoded = tf.keras.layers.Dense(8, activation='relu')(self._input_layer)
+        self._encoding_layer = tf.keras.layers.Dense(code_dim, activation='relu')(cur)
+
+        # Define the decoder layer
+        prev = self._encoding_layer
+        for i in range(len(architecture)-1, -1, -1):
+            cur = tf.keras.layers.Dense(architecture[i], activation=tf.keras.layers.LeakyReLU(alpha=0.01))(prev)
+            prev = cur
+        # decoded = tf.keras.layers.Dense(8, activation='relu')(self._encoding_layer)
+        decoded = tf.keras.layers.Dense(input_dim, activation='relu')(cur)
+
+        self._model = tf.keras.models.Model(self._input_layer, decoded)
+        self._model.compile(optimizer='adam', loss='mean_squared_error')
+        self._encoder = None
+
+    def load_weights(self, file_path):
+        self._model.load_weights(file_path)
+
+    def train_model(self, x_train, batch_size=256, epochs=30, plot_valid_loss=False):
+        x_train, x_valid = self._train_validate_split(x_train)
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=3,
+            verbose=1,
+            restore_best_weights=True)
+        checkpoint_path = "models/model_checkpoint_{epoch:02d}.h5"  # Filepath with epoch number placeholder
+        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_path,
+            save_weights_only=True,  # Set to True to save only model weights
+            verbose=1)
+        history = self._model.fit(
+            x_train, x_train,
+            epochs=epochs,
+            batch_size=batch_size,
+            shuffle=True,
+            validation_data=(x_valid, x_valid),
+            callbacks=[early_stopping])
+        self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
+
+        if plot_valid_loss:
+            # Plot validation loss versus epoch
+            plt.plot(history.history['val_loss'], label='Validation Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Validation Loss')
+            plt.title('Validation Loss vs. Epoch')
+            plt.legend()
+            plt.show()
+
+    def _train_validate_split(self, x_train):
+        # Get the length of the original array
+        num_data = len(x_train)
+
+        # Generate indices for the 10% sample (randomly chosen without replacement)
+        sample_indices = np.random.choice(num_data, size=int(num_data * 0.2), replace=False)
+
+        # Create the 20% sample array
+        x_valid = x_train[sample_indices]
+
+        # Create the 80% array (excluding elements from the 10% sample)
+        remainder_indices = np.setdiff1d(np.arange(num_data), sample_indices)
+        new_x_train = x_train[remainder_indices]
+
+        return new_x_train, x_valid
+
+    def reconstruction_error(self, x_test):
+        """
+        Accepts 2d array of feature vectors as input, gets reconstruction error of each data point.
+        :param x_test:
+        :return:
+        """
+        reconstructions = self._model.predict(x_test)
+        errors = np.sum((reconstructions - x_test) ** 2, axis=1)
+
+        return errors
+
+    def get_encodings(self, x_test):
+        encodings = self._encoder.predict(x_test)
+        return encodings
+
