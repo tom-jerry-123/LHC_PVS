@@ -1,6 +1,7 @@
 /shelf/
-/workspace.xml
+.idea/workspace.xml
 __pycache__/
+playground_file.py
 *.root
 *.csv
 *.jpg
