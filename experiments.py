@@ -109,6 +109,10 @@ def run_rec_err_model(autoencoder, folder, file):
                    labels=["Sum pt2", "Decoder"], title="TTBAR ROC Curves")
 
 
+def run_density_eff_test():
+    pass
+
+
 if __name__ == "__main__":
     # # 10 tracks, compact neural net
     # run_rec_err_model(Autoencoder(input_dim=10, code_dim=3, architecture=(8, 6)), FOLDER_10, PT_FILE_10)

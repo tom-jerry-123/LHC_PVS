@@ -1,5 +1,5 @@
 """
-Miscellaneous helper functions
+Miscellaneous helper functions for testing and analyzing models
 for getting data classifications
 for getting tp / fp rates
 """
