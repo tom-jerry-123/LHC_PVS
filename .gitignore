@@ -2,6 +2,7 @@
 .idea/workspace.xml
 __pycache__/
 playground_file.py
+file_paths.py
 *.root
 *.csv
 *.jpg
