@@ -92,6 +92,7 @@ def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     np.savetxt(outfile_path, feat_data, delimiter=',', fmt='%s')
     print(f"Successfully saved data batch to '{outfile_path}'")
 
+
 def read_z_coord_to_csv(outfile_path, batch_range=None):
     with uproot.open(ROOT_PATH) as file:
         tree = file["EventTree;1"]
@@ -118,10 +119,61 @@ def read_z_coord_to_csv(outfile_path, batch_range=None):
     print(f"Successfully saved data batch to '{outfile_path}'")
 
 
+def read_sum_pt2_to_csv(track_pts, outfile_path, batch_range=None):
+    """
+    Reads sum of pt2 for each vertex to a csv file, along with y_label.
+    :param track_pts:
+    :return:
+    """
+    with uproot.open(ROOT_PATH) as file:
+        tree = file["EventTree;1"]
+        idx_array = tree['recovertex_tracks_idx'].array()
+        weight_array = tree['recovertex_tracks_weight'].array()
+        isHS_array = tree['recovertex_isHS'].array()
+
+    vertex_data = []
+    labels = []
+    N_events = len(idx_array)
+    if batch_range is None:
+        batch_range = (0, N_events)
+    if batch_range[1] > N_events or batch_range[0] < 0:
+        raise ValueError("Invalid range request for processing batch!")
+    print(f"Processing Batch from event {batch_range[0]} to event {batch_range[1]}")
+    for i in range(batch_range[0], batch_range[1]):
+        labels.extend(isHS_array[i][:-1])
+        N_vertices = len(idx_array[i])
+        event_pts = np.array(track_pts[i])
+        event_weight_arrs = weight_array[i]
+        event_idx_arrs = idx_array[i]
+        # We ignore the last vertex as it is irrelevant
+        for j in range(N_vertices-1):
+            # Get proper tracks (i.e. weight > 0.75)
+            vertex_weights = event_weight_arrs[j]
+            vertex_idxs = event_idx_arrs[j]
+            weight_mask = vertex_weights >= 0.75
+            vertex_idxs = vertex_idxs[weight_mask]
+            vertex_pts = event_pts[vertex_idxs]
+            # get tracks with proper pt
+            vertex_pts = vertex_pts[vertex_pts <= 50]
+            sum_pt2 = np.sum(np.multiply(vertex_pts, vertex_pts))
+            vertex_data.append(sum_pt2)
+        if i % 100 == 0:
+            print(f"Done event {i}.")
+
+    headers = ["sum-pt2", 'y']
+    final_data = np.column_stack((np.array(vertex_data), labels))
+    final_data = np.vstack((headers, final_data))
+
+    np.savetxt(outfile_path, final_data, delimiter=',', fmt='%s')
+    print(f"Successfully saved data batch to '{outfile_path}'")
+
+
 if __name__ == "__main__":
     BATCH_SIZE = 500
     N_TRACKS = 50
     track_pts = load_pt("other_data_files/track_pt_full_ttbar.csv")
     for k in range(0, 3):
         batch_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
-        read_pt_to_csv(track_pts, f"{N_TRACKS}_track_batches/{N_TRACKS}_track_batch_{k}.csv", N_TRACKS=50, batch_range=batch_range)
+        read_sum_pt2_to_csv(track_pts, f"sum_pt2_batches/ttbar_sum_pt2_batch_{k}.csv", batch_range=batch_range)
+        # read_pt_to_csv(track_pts, f"{N_TRACKS}_track_batches/{N_TRACKS}_track_batch_{k}.csv", N_TRACKS=50, batch_range=batch_range)
+        # read_z_coord_to_csv(f"{N_TRACKS}_track_batches/{N_TRACKS}_track_z_coord_batch_{k}.csv", batch_range=batch_range)

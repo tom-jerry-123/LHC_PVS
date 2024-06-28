@@ -147,7 +147,7 @@ def plot_hists(num_vertices):
     STD_Z = 45
     AVE_N_VERTEX = 200
     z_coord = stats.norm.rvs(loc=MEAN_Z, scale=STD_Z, size=num_vertices)
-    # z_sample = stats.uniform.rvs()
+    # z_sample = stats.uniform.rvs(loc=-500, scale=1000, size=num_vertices)
     densities = AVE_N_VERTEX * stats.norm.pdf(z_coord, loc=MEAN_Z, scale=STD_Z)
 
     # Create a figure with two subplots
