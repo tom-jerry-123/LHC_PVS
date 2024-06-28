@@ -31,7 +31,7 @@ def load_pt(pt_path):
 
 def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     """
-    Reads the pts to a csv-file. Top N_TRACKS pt and their corresponding delta-R
+    Reads the pts to a csv-file. Top N_TRACKS pt
     :param track_pts: list of computed track pts
     :param outfile_path: Name of output file
     :param N_TRACKS: number of pt tracks to store
@@ -57,7 +57,6 @@ def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     for i in range(batch_range[0], batch_range[1]):
         # Ignoring final vertex for labels and z-coordinate
         labels.extend(isHS_array[i][:-1])
-        z_coords.extend(vertex_z_array[i][:-1])
         # Collect the data on the current event
         N_vertices = len(idx_array[i])
         event_pts = np.array(track_pts[i])
@@ -86,12 +85,36 @@ def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
 
     # Create headers
     headers = ["pt_" + str(i) for i in range(N_TRACKS)]
-    headers.append("z-coord")
     headers.append("y")
-    final_data = np.column_stack((np.array(pt_data), z_coords, labels))
-    final_data = np.vstack((headers, final_data))
+    feat_data = np.column_stack((np.array(pt_data), labels))
+    feat_data = np.vstack((headers, feat_data))
 
-    np.savetxt(outfile_path, final_data, delimiter=',', fmt='%s')
+    np.savetxt(outfile_path, feat_data, delimiter=',', fmt='%s')
+    print(f"Successfully saved data batch to '{outfile_path}'")
+
+def read_z_coord_to_csv(outfile_path, batch_range=None):
+    with uproot.open(ROOT_PATH) as file:
+        tree = file["EventTree;1"]
+        isHS_array = tree['recovertex_isHS'].array()
+        vertex_z_array = tree['recovertex_z'].array()
+
+    z_coords = []
+    labels = []
+    N_events = len(vertex_z_array)
+    if batch_range is None:
+        batch_range = (0, N_events)
+    if batch_range[1] > N_events or batch_range[0] < 0:
+        raise ValueError("Invalid range request for processing batch!")
+    print(f"Processing Batch from event {batch_range[0]} to event {batch_range[1]}")
+    for i in range(batch_range[0], batch_range[1]):
+        # Ignoring final vertex for labels and z-coordinate
+        labels.extend(isHS_array[i][:-1])
+        z_coords.extend(vertex_z_array[i][:-1])
+
+    z_coord_data = np.column_stack((z_coords, labels))
+    z_coord_data = np.vstack((["z_coord", "y"], z_coord_data))
+
+    np.savetxt(outfile_path, z_coord_data, delimiter=',', fmt='%s')
     print(f"Successfully saved data batch to '{outfile_path}'")
 
 

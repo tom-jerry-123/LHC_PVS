@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_reconstruction_errors(pu_errors, hs_errors, xlim=None, num_bins=100, save_path=None):
+def plot_reco_err(pu_errors, hs_errors, xlim=None, num_bins=100, save_path=None):
     fig, axs = plt.subplots(1, 2)
     plt.subplots_adjust(hspace=0.4, wspace=0.4)
 

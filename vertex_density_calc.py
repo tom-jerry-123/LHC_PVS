@@ -4,7 +4,7 @@ Calculates and plots vertex density
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import norm
+import scipy.stats as stats
 import uproot
 
 ROOT_PATH = "C:/Users/jerry/Documents/Phys_Summer_Research/root_files/ttbar_hist-Rel21sample.root"
@@ -20,6 +20,7 @@ def get_tree():
 
 """
 Functions for plotting vertex count
+(Not used anymore)
 """
 
 def plot_actual_count(bin_size, bin_range, show_plot=True):
@@ -63,10 +64,13 @@ def plot_expected_count(bin_size=1, bin_range=None, num_vertex=200, show_plot=Tr
     x = np.arange(bin_range[0] + 0.5 * bin_size, bin_range[1] + 0.5 * bin_size, bin_size)
 
     # Calculate the Gaussian (normal) distribution values for y
-    y = N * bin_size * norm.pdf(x, mean, std_dev)
+    y = N * bin_size * stats.norm.pdf(x, mean, std_dev)
 
     # Plot the Gaussian curve
     plt.plot(x, y, label='Expected')
+    plt.ylabel("Density")
+    plt.xlabel("Z-Coordinate")
+    plt.title("Vertex Density vs. Z-Coordinate")
 
     # Add a legend
     plt.legend()
@@ -133,5 +137,42 @@ def vertex_density_plot(bin_size, bin_range, event_num=0):
     plt.title("Vertex Density vs. Z-Coordinate")
     plt.show()
 
+
+"""
+Analytical vertex density histograms
+"""
+def plot_hists(num_vertices):
+    # Assuming 200 vertices per event, mean z = 0, std z = 45
+    MEAN_Z = 0
+    STD_Z = 45
+    AVE_N_VERTEX = 200
+    z_coord = stats.norm.rvs(loc=MEAN_Z, scale=STD_Z, size=num_vertices)
+    # z_sample = stats.uniform.rvs()
+    densities = AVE_N_VERTEX * stats.norm.pdf(z_coord, loc=MEAN_Z, scale=STD_Z)
+
+    # Create a figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    # Plot histograms on each subplot
+    ax1.hist(z_coord, bins=50, edgecolor='black', color='blue', alpha=0.7, label='Z-Coordinate')  # Adjust bins as needed
+    ax2.hist(densities, bins=50, edgecolor='black', color='salmon', alpha=0.7, label='Density')
+
+    # Customize plot
+    ax1.set_title('Z Distribution')
+    ax1.set_xlabel('Z-Coordinate')
+    ax2.set_title('Vertex Density Distribution')
+    ax2.set_xlabel('Vertex Density')
+    plt.legend()
+
+    # Adjust layout (optional)
+    plt.tight_layout()
+
+    # Display the plot
+    plt.show()
+
+
+
 if __name__ == "__main__":
-    vertex_density_plot(10, (-120, 120), 133)
+    # vertex_density_plot(10, (-120, 120), 38)
+    plot_hists(10000)
+

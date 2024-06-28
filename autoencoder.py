@@ -8,7 +8,15 @@ import matplotlib.pyplot as plt
 
 
 class Autoencoder:
-    def __init__(self, input_dim=10, code_dim=3, architecture=(8,)):
+    def __init__(self, input_dim=50, code_dim=3, architecture=(8,5,), regularization=None):
+        # Set regularization
+        if regularization == "l2" or regularization == "L2":
+            regularizer = tf.keras.regularizers.l2(0.01)
+        elif regularization == "l1" or regularization == "L1":
+            regularizer = tf.keras.regularizers.l1(0.01)
+        else:
+            regularizer = None
+
         # Define the input layer
         self._input_layer = tf.keras.layers.Input(shape=(input_dim,))
 
@@ -16,18 +24,18 @@ class Autoencoder:
         prev = self._input_layer
         cur = None
         for num in architecture:
-            cur = tf.keras.layers.Dense(num, activation=tf.keras.layers.LeakyReLU(alpha=0.01))(prev)
+            cur = tf.keras.layers.Dense(num, activation=tf.keras.layers.LeakyReLU(alpha=0.01), kernel_regularizer=regularizer)(prev)
             prev = cur
         # encoded = tf.keras.layers.Dense(8, activation='relu')(self._input_layer)
-        self._encoding_layer = tf.keras.layers.Dense(code_dim, activation='relu')(cur)
+        self._encoding_layer = tf.keras.layers.Dense(code_dim, activation='relu', kernel_regularizer=regularizer)(cur)
 
         # Define the decoder layer
         prev = self._encoding_layer
         for i in range(len(architecture)-1, -1, -1):
-            cur = tf.keras.layers.Dense(architecture[i], activation=tf.keras.layers.LeakyReLU(alpha=0.01))(prev)
+            cur = tf.keras.layers.Dense(architecture[i], activation=tf.keras.layers.LeakyReLU(alpha=0.01), kernel_regularizer=regularizer)(prev)
             prev = cur
         # decoded = tf.keras.layers.Dense(8, activation='relu')(self._encoding_layer)
-        decoded = tf.keras.layers.Dense(input_dim, activation='relu')(cur)
+        decoded = tf.keras.layers.Dense(input_dim, activation='relu', kernel_regularizer=regularizer)(cur)
 
         self._model = tf.keras.models.Model(self._input_layer, decoded)
         self._model.compile(optimizer='adam', loss='mean_squared_error')
@@ -36,7 +44,7 @@ class Autoencoder:
     def load_weights(self, file_path):
         self._model.load_weights(file_path)
 
-    def train_model(self, x_train, batch_size=256, epochs=30, plot_valid_loss=False):
+    def train_model(self, x_train, batch_size=256, epochs=20, plot_valid_loss=False):
         x_train, x_valid = self._train_validate_split(x_train)
         early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
@@ -65,6 +73,16 @@ class Autoencoder:
             plt.title('Validation Loss vs. Epoch')
             plt.legend()
             plt.show()
+
+    def print_weights(self):
+        # Print weights and biases of each layer
+        # Print weights and biases of each layer, skipping the input layer
+        for i, layer in enumerate(self._model.layers[1:], start=1):
+            weights, biases = layer.get_weights()
+            print(f"Layer {i}: {layer.name}")
+            print(f"Weights:\n{weights}")
+            print(f"Biases:\n{biases}")
+            print("-" * 30)
 
     def _train_validate_split(self, x_train):
         # Get the length of the original array
