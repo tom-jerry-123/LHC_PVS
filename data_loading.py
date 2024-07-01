@@ -5,6 +5,8 @@ Functions for loading data
 import numpy as np
 import csv
 
+import uproot
+
 
 def load_csv(csv_path, has_headers=True, has_y=True):
     with open(csv_path, 'r') as file:
@@ -26,10 +28,12 @@ def load_csv(csv_path, has_headers=True, has_y=True):
             else:
                 x_data.append(row)
 
-        return np.array(x_data), np.array(y_data)
+    x_data, y_data = np.array(x_data), np.array(y_data)
+
+    return x_data, y_data
 
 
-def load_data(file_path, batch_range=(0, 8)):
+def load_data(file_path, batch_range=(0, 8), flatten_singular_dimension=True):
     # Loads all events
     x_data_lst, y_data_lst = [], []
     for i in range(batch_range[0], batch_range[1]):
@@ -39,6 +43,8 @@ def load_data(file_path, batch_range=(0, 8)):
         y_data_lst.append(cur_y)
     x_data = np.vstack(x_data_lst)
     y_data = np.concatenate(y_data_lst)
+    if flatten_singular_dimension and (x_data.shape[0] == 1 or x_data.shape[1] == 1):
+        x_data = x_data.reshape(-1,)
     return x_data, y_data
 
 
@@ -48,3 +54,24 @@ def load_train_test(file_path, train_range, test_range):
     training_data = x_train[y_train == 0]
     x_test, y_test = load_data(file_path, test_range)
     return training_data, x_test, y_test
+
+
+def load_truth_hs_z(root_file_path, start, end):
+    """
+    Temporary solution for extracting HS vertex z-coordinates.
+    May instead store these coords in csv in future
+    :param root_file_path:
+    :param start: start index of event
+    :param end: index after final event to load
+    :return:
+    """
+    with uproot.open(root_file_path) as file:
+        tree_name = "EventTree;1"
+        tree = file[tree_name]
+
+    truth_z_array = tree['truthvertex_z'].array()
+    hs_z_coords = []
+    for i in range(start, end):
+        hs_z_coords.append(truth_z_array[i][0])
+
+    return np.array(hs_z_coords)

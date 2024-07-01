@@ -1,6 +1,7 @@
 """
 Main file for running models and experiments
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -8,6 +9,8 @@ from autoencoder import Autoencoder
 from data_loading import *
 from plotting import *
 from helpers import *
+import file_paths
+from vertex_density_calc import density_from_z_coord
 
 
 """
@@ -36,10 +39,7 @@ def run_rec_err_model(autoencoder, folder, file):
     """
     # Load training, testing data
     ttbar_train, ttbar_x, ttbar_y = load_train_test(folder + "/" + file, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
-    # ttbar_pt2, ttbar_y = load_data(PT2_FOLDER + "/" + SUM_PT_FILE, TESTING_BATCH_RANGE)
-    # Remove z-coordinates
-    ttbar_train = ttbar_train[:, :-1]
-    ttbar_x = ttbar_x[:, :-1]
+    ttbar_pt2, ttbar_y = load_data(PT2_FOLDER + "/" + SUM_PT_FILE, TESTING_BATCH_RANGE)
 
     last = 1
     test_thresholds = [last + i * 0.2 for i in range(0, 500)]
@@ -65,11 +65,11 @@ def run_rec_err_model(autoencoder, folder, file):
 
     # Get classifications
     ttbar_encoder_yhat = get_classification(rec_err, ttbar_y)
-    # ttbar_base_yhat = get_classification(ttbar_pt2, ttbar_y)
+    ttbar_base_yhat = get_classification(ttbar_pt2, ttbar_y)
 
     # Print Recall Values
     ttbar_encoder_recall = np.sum((ttbar_encoder_yhat == 1) & (ttbar_y == 1)) / np.sum((ttbar_y == 1))
-    # ttbar_base_recall = np.sum((ttbar_base_yhat == 1) & (ttbar_y == 1)) / np.sum((ttbar_y == 1))
+    ttbar_base_recall = np.sum((ttbar_base_yhat == 1) & (ttbar_y == 1)) / np.sum((ttbar_y == 1))
 
     # Print Recall Scores
     print("\n*** Printing Recall Scores ***")
@@ -128,68 +128,59 @@ def run_density_eff_test(autoencoder, file_path):
 
     # Load training, testing data
     ttbar_train, ttbar_x, ttbar_y = load_train_test(file_path, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
-    # NEED TO REDO THE SUM-PT2 BATCHES
-    # ttbar_pt2,  = load_data(PT2_FOLDER + "/" + SUM_PT_FILE, TESTING_BATCH_RANGE)
+    # Load data for pt2
+    ttbar_pt2, _trash = load_data(PT2_FOLDER + "/" + SUM_PT_FILE, TESTING_BATCH_RANGE)
+    # Load z-coordinate data for recovertex
+    ttbar_reco_z, _trash = load_data("50_track_batches/50_track_z_coord_batch_", TESTING_BATCH_RANGE)
+    # Load z-coordinate data for correct hard-scatter vertex
+    hs_truth_z = load_truth_hs_z(file_paths.ROOT_PATH, 1000, 1500)
 
-    # Remove the z-coordinate column from training data; remove and store z-coordinates in testing data
-    ttbar_train = ttbar_train[:, :-1]
-    ttbar_z_coord = ttbar_x[:, -1]
-    ttbar_x = ttbar_x[:, :-1]
+    if len(hs_truth_z) == np.sum(ttbar_y == 1):
+        print("Passed sanity check: extracted one z-coordinate for every hs vertex")
+    else:
+        raise RuntimeError("Error: hs_truth_z not the same length as number of hs vertices!")
 
-    # Do density bin sorting. First get indices of the events
-    split_idxs = list(np.where(ttbar_y)[0])
-    split_idxs.append(len(ttbar_y))
-    split_idxs = np.array(split_idxs)
-    sorted_test_data = {i: [] for i in range(1, 11)}
-    # Now, loop through each event to do the sorting
-    for i in range(1, len(split_idxs)):
-        start = split_idxs[i-1]
-        end = split_idxs[i]
-        event_z = ttbar_z_coord[start:end]
-        # Assuming bin size of 10
-        edges = np.arange(BIN_RANGE[0], BIN_RANGE[1] + BIN_SIZE, BIN_SIZE)
-        counts, edges = np.histogram(event_z, bins=edges)
-        # Add value of 1 as dummy value: all values outside edges range set to 1
-        counts = np.concatenate((counts, np.array([1])))
-        # get which bin each z-coordinate is int
-        bin_idxs = np.digitize(event_z, edges) - 1
-        bin_idxs[bin_idxs < 0] = len(counts) - 1
-        # compute densities based on the bins
-        density_bracket = counts[bin_idxs]
-        density_bracket[density_bracket > 10] = 10
-        event_test = np.column_stack((ttbar_x[start:end], ttbar_y[start:end]))
-        for num in range(1, 11):
-            vertex_idxs = np.where(density_bracket == num)[0]
-            bracket_test_data = event_test[vertex_idxs]
-            sorted_test_data[num].append(bracket_test_data)
-    print("Finished sorting. Stacking each bin into one array.")
-    for num in range(1, 11):
-        sorted_test_data[num] = np.vstack(sorted_test_data[num])
+    # Get classifications of sum-pt2
+    ttbar_base_yhat = get_classification(ttbar_pt2, ttbar_y)
 
-    # Train Autoencoder
+    # Get histogram of densities. First, densities of selected vertices
+    base_selected_zs = ttbar_reco_z[ttbar_base_yhat.astype(bool)]
+    base_densities = density_from_z_coord(base_selected_zs)  # densities from selected vertex
+    base_selected_freq, base_bin_edges = np.histogram(base_densities, bins=20)
+    plot_histogram(base_densities, num_bins=20, title="Density Histograms for Selected Vertices Using Sum-pt2", x_label="Density")
+    # Now, densities of correctly selected vertices, i.e. true positives
+    base_tp_zs = base_selected_zs[abs(base_selected_zs - hs_truth_z) < 1]
+    base_tp_densities = density_from_z_coord(base_tp_zs)
+    base_tp_freq, base_bin_edges = np.histogram(base_tp_densities, bins=base_bin_edges)
+    plot_histogram(base_tp_densities, num_bins=20, title="Density Histogram for Successful Selection, Sum-pt2", x_label="Density")
+
+    # Calculate efficiencies, then plot
+    efficiencies = base_tp_freq / base_selected_freq
+    midpoints = (base_bin_edges[:-1] + base_bin_edges[1:]) / 2
+    line_plot(midpoints, efficiencies, title="Efficiency vs. Density, Sum-pt2", xlabel="Vertex Density",
+              ylabel="Efficiency")
+
+    # Now, do the density hists for the autoencoder.
     model = autoencoder
-    model.train_model(ttbar_train, epochs=10, plot_valid_loss=True)
+    model.train_model(ttbar_train, epochs=30, plot_valid_loss=False)
+    ttbar_enc_yhat = get_classification(model.reconstruction_error(ttbar_x), ttbar_y)
+    # Get hist. of densities
+    enc_selected_zs = ttbar_reco_z[ttbar_enc_yhat.astype(bool)]
+    enc_densities = density_from_z_coord(enc_selected_zs)
+    enc_selected_freq, enc_bin_edges = np.histogram(enc_densities, bins=20)
+    plot_histogram(enc_densities, num_bins=20, title="Density Histograms for Selected Vertices Using Autoencoder",
+                   x_label="Density")
+    # Now, densities of correctly selected vertices, i.e. true positives
+    enc_tp_zs = enc_selected_zs[abs(enc_selected_zs - hs_truth_z) < 1]
+    enc_tp_densities = density_from_z_coord(enc_tp_zs)
+    enc_tp_freq, enc_bin_edges = np.histogram(enc_tp_densities, bins=enc_bin_edges)
+    plot_histogram(enc_tp_densities, num_bins=enc_bin_edges, title="Density Histogram for Successful Selection, Autoencoder",
+                   x_label="Density")
 
-    # Test the model
-    efficiencies = {i: 0.0 for i in range(1, 11)}
-    for num in range(1, 11):
-        cur_x = sorted_test_data[num][:, :-1]
-        cur_y = sorted_test_data[num][:, -1]
-        errs = model.reconstruction_error(cur_x)
-        predictions = errs > ERR_THRESHOLD
-        efficiency = np.sum(predictions & (cur_y == 1)) / np.sum(cur_y == 1)
-        print(f"Efficiency for bracket {num}: {efficiency}")
-        efficiencies[num] = efficiency
-
-    # Plot efficiencies
-    point_pairs = list(efficiencies.items())
-    densities = [point_pairs[i][0]/10 for i in range(10)]
-    recall_rates = [point_pairs[i][1] for i in range(10)]
-    plt.plot(densities, recall_rates)
-    plt.xlabel("Vertex Density")
-    plt.ylabel("Efficiency")
-    plt.title("HS Vertex Selection Efficiency vs Pileup Density")
-    plt.show()
+    enc_efficiencies = enc_tp_freq / enc_selected_freq
+    midpoints = (enc_bin_edges[:-1] + enc_bin_edges[1:]) / 2
+    line_plot(midpoints, enc_efficiencies, title="Efficiency vs. Density, Autoencoder", xlabel="Vertex Density",
+              ylabel="Efficiency")
 
 
 def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
@@ -215,19 +206,4 @@ def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
 
 
 if __name__ == "__main__":
-    # # 10 tracks, compact neural net
-    # run_rec_err_model(Autoencoder(input_dim=10, code_dim=3, architecture=(8, 6), regularization="l2"), FOLDER_10, PT_FILE_10)
-    # # 25 tracks, compact neural net
-    # run_rec_err_model(Autoencoder(input_dim=25, code_dim=3, architecture=(8, 5)), FOLDER_25, PT_FILE_25)
-    # 50 tracks, compact neural net
-    regularizations = [None, "L1", "L2"]
-    architectures = [(8, 5)]
-    for reg in regularizations:
-        for arch in architectures:
-            print("*****")
-            print(f"Regularization: {reg}, Architecture: {arch}")
-            print("*****")
-            run_rec_err_model(Autoencoder(input_dim=50, code_dim=3, architecture=arch, regularization=reg), FOLDER_50, PT_FILE_50)
-            print()
-    # quick_model_diagnostic(Autoencoder(input_dim=50, code_dim=3, architecture=(8, 5), regularization='l2'), FOLDER_50 + "/" + PT_FILE_50)
-    # run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(8, 5)), FOLDER_50 + "/" + PT_FILE_50)
+    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(8, 5), regularization="L2"), FOLDER_50 + "/" + PT_FILE_50)

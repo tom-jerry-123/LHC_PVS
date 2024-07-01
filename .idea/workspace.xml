@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f45e254e-64b0-462c-840a-803cb5c9bda7" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/data_loading.py" beforeDir="false" afterPath="$PROJECT_DIR$/data_loading.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/experiments.py" beforeDir="false" afterPath="$PROJECT_DIR$/experiments.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plotting.py" beforeDir="false" afterPath="$PROJECT_DIR$/plotting.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/vertex_density_calc.py" beforeDir="false" afterPath="$PROJECT_DIR$/vertex_density_calc.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -53,16 +55,5 @@
       <updated>1719419491598</updated>
     </task>
     <servers />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/vertex_density_calc.py</url>
-          <line>100</line>
-          <option name="timeStamp" value="2" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
 </project>

@@ -6,6 +6,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def plot_histogram(data, num_bins, title="", x_label="", show_plot=True):
+    plt.hist(data, bins=num_bins, edgecolor='black', color='blue', alpha=0.7)
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel("Frequency")
+
+    if show_plot:
+        plt.show()
+
+
+def line_plot(x_data, y_data, title="", xlabel="", ylabel=""):
+    plt.plot(x_data, y_data, marker='o', linestyle='-')
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.show()
+
+
 def plot_reco_err(pu_errors, hs_errors, xlim=None, num_bins=100, save_path=None):
     fig, axs = plt.subplots(1, 2)
     plt.subplots_adjust(hspace=0.4, wspace=0.4)

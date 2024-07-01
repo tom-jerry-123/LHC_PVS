@@ -10,6 +10,14 @@ import uproot
 ROOT_PATH = "C:/Users/jerry/Documents/Phys_Summer_Research/root_files/ttbar_hist-Rel21sample.root"
 
 
+def density_from_z_coord(z_coords):
+    # Assume 100 reconstructed vertices on average
+    MEAN_Z = 0
+    STD_Z = 45
+    AVE_N_VERTEX = 100
+    densities = AVE_N_VERTEX * stats.norm.pdf(z_coords, loc=MEAN_Z, scale=STD_Z)
+    return densities
+
 def get_tree():
     with uproot.open(ROOT_PATH) as file:
         tree_name = "EventTree;1"
