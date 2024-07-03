@@ -16,17 +16,20 @@ from vertex_density_calc import density_from_z_coord
 """
 Variables to use
 """
-FOLDER_10 = "10_track_batches"
-PT_FILE_10 = "10_track_pt_batch_"
-FOLDER_25 = "25_track_batches"
-PT_FILE_25 = "ttbar_pt_batch_"
-FOLDER_50 = "50_track_batches"
-PT_FILE_50 = "50_track_batch_"
+FEAT_FOLDER = "50_track_batches"
+TTBAR_PT_FILE = "50_track_ttbar_pt_"
+TTBAR_Z_FILE = "50_track_ttbar_z_"
+VBF_PT_FILE = "50_track_vbf_pt_"
+VBF_Z_FILE = "50_track_vbf_z_"
 
 PT2_FOLDER = "sum_pt2_batches"
-SUM_PT_FILE = "ttbar_sum_pt2_batch_"
-TRAINING_BATCH_RANGE = (0, 2)
-TESTING_BATCH_RANGE = (2, 3)
+TTBAR_SUM_PT2 = "ttbar_sum_pt2_"
+VBF_SUM_PT2 = "vbf_sum_pt2_"
+
+
+TRAINING_BATCH_RANGE = (0, 1)
+TESTING_BATCH_RANGE = (0, 15)
+BATCH_SIZE = 500
 
 
 def run_rec_err_model(autoencoder, folder, file):
@@ -115,72 +118,59 @@ def run_rec_err_model(autoencoder, folder, file):
     #                labels=["Sum pt2", "Decoder"], title="TTBAR ROC Curves")
 
 
-def run_density_eff_test(autoencoder, file_path):
+def run_density_eff_test(autoencoder):
     """
     For our efficiency vs density plot, we assume bin size of 10 when doing density sorting
     :param model:
     :param file_path:
     :return:
     """
-    BIN_SIZE = 10
-    BIN_RANGE = (-120, 120)
-    ERR_THRESHOLD = 80
 
     # Load training, testing data
-    ttbar_train, ttbar_x, ttbar_y = load_train_test(file_path, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+    # ttbar_train, ttbar_x, ttbar_y = load_train_test(FEAT_FOLDER + "/" + TTBAR_PT_FILE, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+    vbf_train, vbf_x, vbf_y = load_train_test(FEAT_FOLDER + "/" + VBF_PT_FILE, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+    # x_train = np.vstack((ttbar_train, vbf_train))
+
     # Load data for pt2
-    ttbar_pt2, _trash = load_data(PT2_FOLDER + "/" + SUM_PT_FILE, TESTING_BATCH_RANGE)
+    # ttbar_pt2, _trash = load_data(PT2_FOLDER + "/" + TTBAR_SUM_PT2, TESTING_BATCH_RANGE)
+    vbf_pt2, _trash = load_data(PT2_FOLDER + "/" + VBF_SUM_PT2, TESTING_BATCH_RANGE)
+
     # Load z-coordinate data for recovertex
-    ttbar_reco_z, _trash = load_data("50_track_batches/50_track_z_coord_batch_", TESTING_BATCH_RANGE)
+    # ttbar_reco_z, _trash = load_data(FEAT_FOLDER + "/" + TTBAR_Z_FILE, TESTING_BATCH_RANGE)
+    vbf_reco_z, _trash = load_data(FEAT_FOLDER + "/" + VBF_Z_FILE, TESTING_BATCH_RANGE)
     # Load z-coordinate data for correct hard-scatter vertex
-    hs_truth_z = load_truth_hs_z(file_paths.ROOT_PATH, 1000, 1500)
+    # ttbar_hs_truth_z = load_truth_hs_z(file_paths.ROOT_PATH, TESTING_BATCH_RANGE[0] * BATCH_SIZE, TESTING_BATCH_RANGE[1] * BATCH_SIZE)
+    vbf_hs_truth_z = load_truth_hs_z(file_paths.VBF_ROOT_PATH, TESTING_BATCH_RANGE[0] * BATCH_SIZE, TESTING_BATCH_RANGE[1] * BATCH_SIZE)
 
-    if len(hs_truth_z) == np.sum(ttbar_y == 1):
-        print("Passed sanity check: extracted one z-coordinate for every hs vertex")
+    # if len(ttbar_hs_truth_z) == np.sum(ttbar_y == 1):
+    #     print("Passed sanity check: extracted one z-coordinate for every TTBAR hs vertex")
+    # else:
+    #     raise RuntimeError("Error: hs_truth_z not the same length as number of hs vertices for TTBAR!")
+
+    if len(vbf_hs_truth_z) == np.sum(vbf_y == 1):
+        print("Passed sanity check: extracted one z-coordinate for every VBF hs vertex")
     else:
-        raise RuntimeError("Error: hs_truth_z not the same length as number of hs vertices!")
+        raise RuntimeError("Error: hs_truth_z not the same length as number of hs vertices for VBF!")
 
-    # Get classifications of sum-pt2
-    ttbar_base_yhat = get_classification(ttbar_pt2, ttbar_y)
-
-    # Get histogram of densities. First, densities of selected vertices
-    base_selected_zs = ttbar_reco_z[ttbar_base_yhat.astype(bool)]
-    base_densities = density_from_z_coord(base_selected_zs)  # densities from selected vertex
-    base_selected_freq, base_bin_edges = np.histogram(base_densities, bins=20)
-    plot_histogram(base_densities, num_bins=20, title="Density Histograms for Selected Vertices Using Sum-pt2", x_label="Density")
-    # Now, densities of correctly selected vertices, i.e. true positives
-    base_tp_zs = base_selected_zs[abs(base_selected_zs - hs_truth_z) < 1]
-    base_tp_densities = density_from_z_coord(base_tp_zs)
-    base_tp_freq, base_bin_edges = np.histogram(base_tp_densities, bins=base_bin_edges)
-    plot_histogram(base_tp_densities, num_bins=20, title="Density Histogram for Successful Selection, Sum-pt2", x_label="Density")
-
-    # Calculate efficiencies, then plot
-    efficiencies = base_tp_freq / base_selected_freq
-    midpoints = (base_bin_edges[:-1] + base_bin_edges[1:]) / 2
-    line_plot(midpoints, efficiencies, title="Efficiency vs. Density, Sum-pt2", xlabel="Vertex Density",
-              ylabel="Efficiency")
-
-    # Now, do the density hists for the autoencoder.
+    # Train the autoencoder
     model = autoencoder
-    model.train_model(ttbar_train, epochs=30, plot_valid_loss=False)
-    ttbar_enc_yhat = get_classification(model.reconstruction_error(ttbar_x), ttbar_y)
-    # Get hist. of densities
-    enc_selected_zs = ttbar_reco_z[ttbar_enc_yhat.astype(bool)]
-    enc_densities = density_from_z_coord(enc_selected_zs)
-    enc_selected_freq, enc_bin_edges = np.histogram(enc_densities, bins=20)
-    plot_histogram(enc_densities, num_bins=20, title="Density Histograms for Selected Vertices Using Autoencoder",
-                   x_label="Density")
-    # Now, densities of correctly selected vertices, i.e. true positives
-    enc_tp_zs = enc_selected_zs[abs(enc_selected_zs - hs_truth_z) < 1]
-    enc_tp_densities = density_from_z_coord(enc_tp_zs)
-    enc_tp_freq, enc_bin_edges = np.histogram(enc_tp_densities, bins=enc_bin_edges)
-    plot_histogram(enc_tp_densities, num_bins=enc_bin_edges, title="Density Histogram for Successful Selection, Autoencoder",
-                   x_label="Density")
+    # model.train_model(x_train, epochs=20, plot_valid_loss=False)
+    # ttbar_err = model.reconstruction_error(ttbar_x)
+    # vbf_err = model.reconstruction_error(vbf_x)
 
-    enc_efficiencies = enc_tp_freq / enc_selected_freq
-    midpoints = (enc_bin_edges[:-1] + enc_bin_edges[1:]) / 2
-    line_plot(midpoints, enc_efficiencies, title="Efficiency vs. Density, Autoencoder", xlabel="Vertex Density",
-              ylabel="Efficiency")
+    # Get efficiencies for TTBAR
+    # pt2_ttbar_eff, pt2_ttbar_midpts, pt2_ttbar_std = get_efficiencies_vs_density(ttbar_pt2, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, num_bins=10, algo_name="Sum-pt2")
+    # enc_ttbar_eff, enc_ttbar_midpts = get_efficiencies_vs_density(ttbar_err, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, plot_hist=True, algo_name="Autoencoder")
+
+    # Get the efficiencies for VBF
+    pt2_vbf_eff, pt2_vbf_midpts, pt2_vbf_std = get_efficiencies_vs_density(vbf_pt2, vbf_y, vbf_reco_z, vbf_hs_truth_z, algo_name="Sum-pt2")
+    # enc_vbf_eff, enc_vbf_midpts = get_efficiencies_vs_density(vbf_err, vbf_y, vbf_reco_z, vbf_hs_truth_z, plot_hist=False, algo_name="Autoencoder")
+
+    # Plot the curves
+    # line_plot([pt2_ttbar_midpts], [pt2_ttbar_eff], ['Sum-pt2'], title="Efficiency vs. Density for TTBAR", xlabel="Vertex Density",
+    #           ylabel="Efficiency")
+    line_plot([pt2_vbf_midpts], [pt2_vbf_eff], [pt2_vbf_std], labels=['Sum-pt2'], title="Efficiency vs. Density for VBF", xlabel="Vertex Density",
+              ylabel="Efficiency", ylim=(0.7, 1.0))
 
 
 def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
@@ -206,4 +196,4 @@ def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
 
 
 if __name__ == "__main__":
-    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(8, 5), regularization="L2"), FOLDER_50 + "/" + PT_FILE_50)
+    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(18, 7), regularization="L2"))

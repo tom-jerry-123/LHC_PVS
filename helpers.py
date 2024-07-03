@@ -5,6 +5,8 @@ for getting tp / fp rates
 """
 
 import numpy as np
+from vertex_density_calc import density_from_z_coord
+from plotting import plot_histogram
 
 
 def get_classification(vals, y_data):
@@ -48,3 +50,52 @@ def get_fp_tp(test_thresholds, pu_vals, hs_vals):
         fp_rates.append(fp_rate)
 
     return np.array(tp_rates), np.array(fp_rates)
+
+
+def get_efficiencies_vs_density(algo_scores, y_data, reco_zs, hs_truth_zs, num_bins=10, interpolate=True,
+                                plot_hist=True, algo_name=""):
+    """
+    Returns efficiencies and bin midpoints calculated (in this order)
+    :param algo_scores:
+    :param y_data:
+    :param reco_zs:
+    :param hs_truth_zs:
+    :param plot_hist:
+    :param algo_name:
+    :return:
+    """
+    # Get classifications of sum-pt2
+    yhat = get_classification(algo_scores, y_data)
+
+    # Get histogram of densities. First, densities of selected vertices
+    yhat_zs = reco_zs[yhat.astype(bool)]
+    densities = density_from_z_coord(yhat_zs)  # densities from selected vertex
+
+    # calculate bins
+    bins = num_bins
+    if interpolate:
+        sorted_data = np.sort(densities)
+        # Use np.interp to calculate bin edges such that each bin contains an equal number of data points
+        bins = np.interp(np.linspace(0, len(sorted_data), num_bins + 1),
+                         np.arange(len(sorted_data)),
+                         sorted_data)
+
+    # now, calculate the histogram for selected vertices
+    yhat_freq, bin_edges = np.histogram(densities, bins=bins)
+
+    # Now, densities of correctly selected vertices, i.e. true positives
+    tp_zs = yhat_zs[abs(yhat_zs - hs_truth_zs) < 1]
+    tp_densities = density_from_z_coord(tp_zs)
+    tp_freq, bin_edges = np.histogram(tp_densities, bins=bin_edges)
+
+    if plot_hist:
+        plot_histogram(densities, bins=bin_edges, title="Density Histograms for Selected Vertices, " + algo_name,
+                       x_label="Density")
+        plot_histogram(tp_densities, bins=bin_edges, title="Density Histogram for Successful Selection, " + algo_name, x_label="Density")
+
+    # Compute efficiencies and midpoints, then return
+    efficiencies = tp_freq / yhat_freq
+    midpoints = (bin_edges[:-1] + bin_edges[1:]) / 2
+    eff_std = np.sqrt(efficiencies * (1 - efficiencies) / yhat_freq)
+
+    return efficiencies, midpoints, eff_std

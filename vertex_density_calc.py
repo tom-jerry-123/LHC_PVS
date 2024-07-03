@@ -14,7 +14,7 @@ def density_from_z_coord(z_coords):
     # Assume 100 reconstructed vertices on average
     MEAN_Z = 0
     STD_Z = 45
-    AVE_N_VERTEX = 100
+    AVE_N_VERTEX = 200
     densities = AVE_N_VERTEX * stats.norm.pdf(z_coords, loc=MEAN_Z, scale=STD_Z)
     return densities
 

@@ -12,6 +12,30 @@ import uproot
 import csv
 
 
+def compute_track_pt(tree_file, out_path, event_range):
+    with uproot.open(tree_file) as file:
+        tree = file['EventTree;1']
+        qOverP_array = tree['track_qOverP'].array()
+        theta_array = tree['track_theta'].array()
+
+    track_pt_data = []
+    if event_range[0] < 0 or event_range[0] >= event_range[1] or event_range[1] > len(theta_array):
+        raise ValueError("Event range is invalid!")
+    print(f"Starting track pt calculations for events {event_range[0]} to {event_range[1]-1}")
+    for i in range(event_range[0], event_range[1]):
+        thetas = np.array(theta_array[i])
+        qOverP_vals = np.array(qOverP_array[i])
+        pts = np.sin(thetas) / np.abs(qOverP_vals) / 1000
+        track_pt_data.append(pts)
+
+    print(f"Completed pt calculations for {event_range[1] - event_range[0]} events.")
+
+    with open(out_path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(track_pt_data)
+
+
+
 def load_pt(pt_path):
     track_pts = []
     with open(pt_path, mode='r') as file:
@@ -29,7 +53,7 @@ def load_pt(pt_path):
     return track_pts
 
 
-def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
+def read_pt_to_csv(tree, track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     """
     Reads the pts to a csv-file. Top N_TRACKS pt
     :param track_pts: list of computed track pts
@@ -38,12 +62,11 @@ def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     :param batch_range: two-tuple specifying event indices of start and end of range to process
     :return:
     """
-    with uproot.open(ROOT_PATH) as file:
-        tree = file["EventTree;1"]
-        idx_array = tree['recovertex_tracks_idx'].array()
-        weight_array = tree['recovertex_tracks_weight'].array()
-        isHS_array = tree['recovertex_isHS'].array()
-        vertex_z_array = tree['recovertex_z'].array()
+
+    idx_array = tree['recovertex_tracks_idx'].array()
+    weight_array = tree['recovertex_tracks_weight'].array()
+    isHS_array = tree['recovertex_isHS'].array()
+    vertex_z_array = tree['recovertex_z'].array()
 
     pt_data = []
     z_coords = []
@@ -93,11 +116,9 @@ def read_pt_to_csv(track_pts, outfile_path, N_TRACKS=50, batch_range=None):
     print(f"Successfully saved data batch to '{outfile_path}'")
 
 
-def read_z_coord_to_csv(outfile_path, batch_range=None):
-    with uproot.open(ROOT_PATH) as file:
-        tree = file["EventTree;1"]
-        isHS_array = tree['recovertex_isHS'].array()
-        vertex_z_array = tree['recovertex_z'].array()
+def read_z_coord_to_csv(tree, outfile_path, batch_range=None):
+    isHS_array = tree['recovertex_isHS'].array()
+    vertex_z_array = tree['recovertex_z'].array()
 
     z_coords = []
     labels = []
@@ -119,17 +140,15 @@ def read_z_coord_to_csv(outfile_path, batch_range=None):
     print(f"Successfully saved data batch to '{outfile_path}'")
 
 
-def read_sum_pt2_to_csv(track_pts, outfile_path, batch_range=None):
+def read_sum_pt2_to_csv(tree, track_pts, outfile_path, batch_range=None):
     """
     Reads sum of pt2 for each vertex to a csv file, along with y_label.
     :param track_pts:
     :return:
     """
-    with uproot.open(ROOT_PATH) as file:
-        tree = file["EventTree;1"]
-        idx_array = tree['recovertex_tracks_idx'].array()
-        weight_array = tree['recovertex_tracks_weight'].array()
-        isHS_array = tree['recovertex_isHS'].array()
+    idx_array = tree['recovertex_tracks_idx'].array()
+    weight_array = tree['recovertex_tracks_weight'].array()
+    isHS_array = tree['recovertex_isHS'].array()
 
     vertex_data = []
     labels = []
@@ -169,11 +188,18 @@ def read_sum_pt2_to_csv(track_pts, outfile_path, batch_range=None):
 
 
 if __name__ == "__main__":
+    # compute_track_pt(VBF_ROOT_PATH, "other_data_files/track_pt_vbf_8000-16000.csv", (8000, 16000))
     BATCH_SIZE = 500
     N_TRACKS = 50
-    track_pts = load_pt("other_data_files/track_pt_full_ttbar.csv")
-    for k in range(0, 3):
+    track_pts = load_pt("other_data_files/track_pt_vbf.csv")
+    new_track_pts = load_pt("other_data_files/track_pt_vbf_8000-16000.csv")
+    track_pts.extend(new_track_pts)
+    print("Successfully loaded all track pts.")
+    with uproot.open(VBF_ROOT_PATH) as file:
+        tree = file["EventTree;1"]
+        print("Successfully loaded tree")
+    for k in range(16, 25):
         batch_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
-        read_sum_pt2_to_csv(track_pts, f"sum_pt2_batches/ttbar_sum_pt2_batch_{k}.csv", batch_range=batch_range)
-        # read_pt_to_csv(track_pts, f"{N_TRACKS}_track_batches/{N_TRACKS}_track_batch_{k}.csv", N_TRACKS=50, batch_range=batch_range)
-        # read_z_coord_to_csv(f"{N_TRACKS}_track_batches/{N_TRACKS}_track_z_coord_batch_{k}.csv", batch_range=batch_range)
+        read_sum_pt2_to_csv(tree, track_pts, f"sum_pt2_batches/vbf_sum_pt2_{k}.csv", batch_range=batch_range)
+        read_pt_to_csv(tree, track_pts, f"{N_TRACKS}_track_batches/{N_TRACKS}_track_vbf_pt_{k}.csv", N_TRACKS=50, batch_range=batch_range)
+        read_z_coord_to_csv(tree, f"{N_TRACKS}_track_batches/{N_TRACKS}_track_vbf_z_{k}.csv", batch_range=batch_range)
