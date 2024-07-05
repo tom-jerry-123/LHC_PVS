@@ -1,6 +1,7 @@
 /shelf/
 .idea/workspace.xml
 __pycache__/
+models/
 playground_file.py
 file_paths.py
 *.root
