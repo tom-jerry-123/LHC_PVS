@@ -35,7 +35,7 @@ def line_plot(x_data_lst, y_data_lst, y_err_lst=None, labels=None, title="", xla
         y_err = [0 for i in range(len(y_data_lst[i]))] if y_err_lst is None else y_err_lst[i]
         # plt.plot(x_data_lst[i], y_data_lst[i], color=colors[i], marker='o', markersize=2, linestyle='-', label=data_label)
         # Create scatter plot with error bars
-        plt.errorbar(x_data_lst[i], y_data_lst[i], yerr=y_err, fmt='o', color='red', label=data_label)
+        plt.errorbar(x_data_lst[i], y_data_lst[i], yerr=y_err, fmt='o', color=colors[i], label=data_label)
 
     plt.xlabel(xlabel, fontsize=18)
     plt.ylabel(ylabel, fontsize=18)

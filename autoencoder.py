@@ -11,9 +11,9 @@ class Autoencoder:
     def __init__(self, input_dim=50, code_dim=3, architecture=(8,5,), regularization=None):
         # Set regularization
         if regularization == "l2" or regularization == "L2":
-            regularizer = tf.keras.regularizers.l2(0.01)
+            regularizer = tf.keras.regularizers.l2(0.005)
         elif regularization == "l1" or regularization == "L1":
-            regularizer = tf.keras.regularizers.l1(0.01)
+            regularizer = tf.keras.regularizers.l1(0.005)
         else:
             regularizer = None
 
@@ -27,7 +27,7 @@ class Autoencoder:
             cur = tf.keras.layers.Dense(num, activation=tf.keras.layers.LeakyReLU(alpha=0.01), kernel_regularizer=regularizer)(prev)
             prev = cur
         # encoded = tf.keras.layers.Dense(8, activation='relu')(self._input_layer)
-        self._encoding_layer = tf.keras.layers.Dense(code_dim, activation='relu', kernel_regularizer=regularizer)(cur)
+        self._encoding_layer = tf.keras.layers.Dense(code_dim, activation=tf.keras.layers.LeakyReLU(alpha=0.01), kernel_regularizer=regularizer)(cur)
 
         # Define the decoder layer
         prev = self._encoding_layer
