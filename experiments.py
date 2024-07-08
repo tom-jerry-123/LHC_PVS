@@ -193,4 +193,4 @@ def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
 
 
 if __name__ == "__main__":
-    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(30, 8), regularization=None))
+    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization=None))
