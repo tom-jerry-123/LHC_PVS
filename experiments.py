@@ -154,13 +154,13 @@ def run_density_eff_test(autoencoder):
 
     # Train the autoencoder
     model = autoencoder
-    model.train_model(ttbar_train, epochs=20, plot_valid_loss=False)
+    # model.train_model(ttbar_train, epochs=20, plot_valid_loss=False)
     ttbar_err = model.reconstruction_error(ttbar_x)
     # vbf_err = model.reconstruction_error(vbf_x)
 
     # Get efficiencies for TTBAR
-    pt2_ttbar_eff, pt2_ttbar_midpts, pt2_ttbar_std = get_efficiencies_vs_density(ttbar_pt2, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, num_bins=10, plot_hist=True, algo_name="Sum-pt2")
-    enc_ttbar_eff, enc_ttbar_midpts, enc_ttbar_std = get_efficiencies_vs_density(ttbar_err, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, plot_hist=True, algo_name="Autoencoder")
+    pt2_ttbar_eff, pt2_ttbar_midpts, pt2_ttbar_std = get_efficiencies_vs_density(ttbar_pt2, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, num_bins=10, plot_hist=False, algo_name="Sum-pt2")
+    enc_ttbar_eff, enc_ttbar_midpts, enc_ttbar_std = get_efficiencies_vs_density(ttbar_err, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, plot_hist=False, algo_name="Autoencoder")
 
     # Get the efficiencies for VBF
     # pt2_vbf_eff, pt2_vbf_midpts, pt2_vbf_std = get_efficiencies_vs_density(vbf_pt2, vbf_y, vbf_reco_z, vbf_hs_truth_z, algo_name="Sum-pt2")
@@ -193,4 +193,5 @@ def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
 
 
 if __name__ == "__main__":
-    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(30, 8), regularization=None))
+    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization="L2"))
+

@@ -39,7 +39,7 @@ class Autoencoder:
 
         self._model = tf.keras.models.Model(self._input_layer, decoded)
         self._model.compile(optimizer='adam', loss='mean_squared_error')
-        self._encoder = None
+        self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
 
     def load_weights(self, file_path):
         self._model.load_weights(file_path)
@@ -115,3 +115,14 @@ class Autoencoder:
         encodings = self._encoder.predict(x_test)
         return encodings
 
+    def get_reconstructions(self, x_test):
+        """
+        For diagnostic purposes only
+        :param x_test:
+        :return:
+        """
+        reconstructions = self._model.predict(x_test)
+        return reconstructions
+
+    def save_weights(self, file_path):
+        self._model.save_weights(file_path)

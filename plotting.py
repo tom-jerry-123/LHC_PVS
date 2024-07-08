@@ -17,7 +17,7 @@ def plot_histogram(data, bins, title="", x_label="", show_plot=True):
 
 
 def line_plot(x_data_lst, y_data_lst, y_err_lst=None, labels=None, title="", xlabel="", ylabel="", ylim=None):
-    colors = ['blue', 'green', 'red']
+    colors = ['blue', 'green', 'red', 'orange']
 
     if len(x_data_lst) != len(y_data_lst):
         raise ValueError("Length of x / y inputs don't match")
@@ -33,9 +33,9 @@ def line_plot(x_data_lst, y_data_lst, y_err_lst=None, labels=None, title="", xla
     for i in range(len(x_data_lst)):
         data_label = f"Dataset {i}" if labels is None else labels[i]
         y_err = [0 for i in range(len(y_data_lst[i]))] if y_err_lst is None else y_err_lst[i]
-        # plt.plot(x_data_lst[i], y_data_lst[i], color=colors[i], marker='o', markersize=2, linestyle='-', label=data_label)
+        plt.plot(x_data_lst[i], y_data_lst[i], color=colors[i], marker='o', markersize=2, linestyle='-', alpha=0.5, label=data_label)
         # Create scatter plot with error bars
-        plt.errorbar(x_data_lst[i], y_data_lst[i], yerr=y_err, fmt='o', color=colors[i], label=data_label)
+        # plt.errorbar(x_data_lst[i], y_data_lst[i], yerr=y_err, fmt='o', color=colors[i], label=data_label)
 
     plt.xlabel(xlabel, fontsize=18)
     plt.ylabel(ylabel, fontsize=18)
@@ -114,13 +114,14 @@ def plot_log_reco_err(pu_errors, hs_errors, hs_errs_2 = None):
 
 
 def plot_err_vs_pt2(err_lst, pt_lst, labels=None):
-    color_lst = ["blue", "red", "yellow", "green"]
+    color_lst = ["blue", "red", "green"]
     N_colors = len(color_lst)
     if len(err_lst) != len(pt_lst):
         raise ValueError("Insufficient sets of label data to complement every set of pt data")
     for i in range(len(err_lst)):
         data_label = f"Dataset {i}" if labels is None else labels[i]
         plt.scatter(pt_lst[i], err_lst[i], color=color_lst[i % N_colors], marker='o', s=2, label=data_label, alpha=0.5)
+    plt.plot([1, 1000], [1, 1000], color='yellow', alpha=0.5)
     plt.xlabel("Sum pt2", fontsize=18)
     plt.ylabel("Reconstruction error", fontsize=18)
     plt.yscale('log')
