@@ -12,6 +12,14 @@ import uproot
 import csv
 
 
+"""
+Functions for computing track feature data (and loading them, if stored)
+Functions include
+compute_track_pt
+load_pt: for loading list of track pts from stored csv file
+"""
+
+
 def compute_track_pt(tree_file, out_path, event_range):
     with uproot.open(tree_file) as file:
         tree = file['EventTree;1']
@@ -51,6 +59,56 @@ def load_pt(pt_path):
 
     print("Done loading csv files")
     return track_pts
+
+
+def compute_track_eta(tree, event_range):
+    theta_array = tree['track_theta'].array()
+    eta_lst = []
+    for i in range(event_range[0], event_range[1]):
+        thetas = np.array(theta_array[i])
+        etas = - np.log(np.tan(thetas/2))
+        eta_lst.append(etas)
+    print(f"Completed Eta Computations from event {event_range[0]} to event {event_range[1]}")
+    return eta_lst
+
+
+def compute_delta_R(tree, event_range):
+    # First, compute track etas as we need them to find min delta r
+    eta_lst = compute_track_eta(tree, event_range)
+    # Collect other necessary data from the tree
+    jet_pt_array = tree['jet_pt'].array()
+    jet_phi_array = tree['jet_phi'].array()
+    jet_eta_array = tree['jet_eta'].array()
+    track_phi_array = tree['track_phi'].array()
+
+    delta_R_data = []
+    for i in range(event_range[0], event_range[1]):
+        mask = jet_pt_array[i] > 30
+        jet_phis = np.array(jet_phi_array[i][mask])
+        jet_etas = np.array(jet_eta_array[i][mask])
+        track_phis = np.array(track_phi_array[i])
+        track_etas = np.array(eta_lst[i])
+        # Compute min r values
+        Dphi_matrix = track_phis[np.newaxis, :] - jet_phis[:, np.newaxis]
+        Dphi_matrix[Dphi_matrix > np.pi] -= 2*np.pi
+        Dphi_matrix[Dphi_matrix < -np.pi] += 2*np.pi
+        R_matrix = Dphi_matrix ** 2 + (track_etas[np.newaxis, :] - jet_etas[:, np.newaxis])**2
+        R_matrix = R_matrix ** 0.5
+        delta_Rs = np.min(R_matrix, axis=0)
+        delta_R_data.append(delta_Rs)
+
+    print(f"Completed delta-R computations from event {event_range[0]} to event {event_range[1]}")
+
+    return delta_R_data
+
+
+"""
+For storing computations in csv files
+Functions include
+read_pt_to_csv
+read_z_coord_to_csv
+read_sum_pt2_to_csv
+"""
 
 
 def read_pt_to_csv(tree, track_pts, outfile_path, N_TRACKS=50, batch_range=None):
@@ -185,6 +243,10 @@ def read_sum_pt2_to_csv(tree, track_pts, outfile_path, batch_range=None):
 
     np.savetxt(outfile_path, final_data, delimiter=',', fmt='%s')
     print(f"Successfully saved data batch to '{outfile_path}'")
+
+
+def read_delta_r_to_csv():
+    pass
 
 
 if __name__ == "__main__":
