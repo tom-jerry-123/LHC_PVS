@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 class Autoencoder:
-    def __init__(self, input_dim=50, code_dim=3, architecture=(8,5,), regularization=None):
+    def __init__(self, input_dim=50, code_dim=3, architecture=(32,), regularization=None, masking=False):
         # Set regularization
         if regularization == "l2" or regularization == "L2":
             regularizer = tf.keras.regularizers.l2(0.005)
@@ -37,10 +37,16 @@ class Autoencoder:
         # decoded = tf.keras.layers.Dense(8, activation='relu')(self._encoding_layer)
         decoded = tf.keras.layers.Dense(input_dim, activation='relu', kernel_regularizer=regularizer)(cur)
 
+        # Now, time to compile model. Apply data masking if requested
         self._model = tf.keras.models.Model(self._input_layer, decoded)
-        # Trying training with data_masking.
-        self._model.compile(optimizer='adam', loss=MaskedMSE())
-        self._encoder = None
+        self._masking = masking
+        if self._masking:
+            self._model.compile(optimizer='adam', loss=MaskedMSE())
+        else:
+            self._model.compile(optimizer='adam', loss='mean_squared_error')
+
+        # Save encoding layer of untrained model (for diagnostic purposes only)
+        self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
 
     def load_weights(self, file_path):
         self._model.load_weights(file_path)
