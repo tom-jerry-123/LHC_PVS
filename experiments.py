@@ -173,10 +173,9 @@ def run_density_eff_test(autoencoder):
     #           ylabel="Efficiency", ylim=(0.7, 1.0))
 
 
-def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
+def quick_model_diagnostic(autoencoder: Autoencoder):
     # Load training, testing data
-    ttbar_train, ttbar_x, ttbar_y = load_train_test(file_path, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
-    # Load SUmp
+    ttbar_train, ttbar_x, ttbar_y = load_train_test("50_track_batches/50_track_ttbar_pt_", TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
 
     model = autoencoder
     model.train_model(ttbar_train, epochs=10, plot_valid_loss=True)
@@ -194,3 +193,4 @@ def quick_model_diagnostic(autoencoder: Autoencoder, file_path):
 
 if __name__ == "__main__":
     run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization=None))
+    # quick_model_diagnostic(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization=None))

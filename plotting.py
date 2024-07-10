@@ -6,12 +6,63 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_histogram(data, bins, title="", x_label="", show_plot=True):
-    plt.hist(data, bins=bins, edgecolor='black', color='blue', alpha=0.7)
+def plot_histogram(data, bins, title="", x_label="", xlim=None, show_plot=True):
+    """
+    Plots basic histogram with single axis
+    :param data:
+    :param bins:
+    :param title:
+    :param x_label:
+    :param show_plot:
+    :return:
+    """
+    bin_arg = bins
+    if xlim is not None:
+        plt.xlim(xlim[0], xlim[1])
+        increment = (xlim[1] - xlim[0]) / bins
+        bin_arg = [i * increment for i in range(bins + 1)]
+
+    plt.hist(data, bins=bin_arg, edgecolor='black', color='blue', alpha=0.7)
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel("Frequency")
 
+    if show_plot:
+        plt.show()
+
+
+def plot_two_axis_hist(data_0, data_1, bins, data_0_label="PU", data_1_label="HS", title="HS vs PU", xlim=None, show_plot=True):
+    # Create figure and axes
+    fig, ax1 = plt.subplots()
+
+    # Create a twin Axes sharing the x-axis
+    ax2 = ax1.twinx()
+
+    bin_arg = bins
+    if xlim is not None:
+        plt.xlim(xlim[0], xlim[1])
+        increment = (xlim[1] - xlim[0]) / bins
+        bin_arg = [i * increment for i in range(bins + 1)]
+
+    # Plot histogram for PU Error Data
+    ax1.hist(data_0, bins=bin_arg, alpha=0.5, color='blue', label=data_0_label)
+    ax1.set_xlabel('Value')
+    ax1.set_ylabel(data_0_label + "Frequency", color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+
+    # Plot histogram for HS Error Data
+    ax2.hist(data_1, bins=bin_arg, alpha=0.5, color='red', label=data_1_label)
+    ax2.set_ylabel(data_1_label + 'Frequency', color='red')
+    ax2.tick_params(axis='y', labelcolor='red')
+
+    # Add legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+    # ax1.set_yscale('log')
+    # ax2.set_yscale('log')
+    plt.title(title)
     if show_plot:
         plt.show()
 

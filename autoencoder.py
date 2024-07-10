@@ -38,7 +38,8 @@ class Autoencoder:
         decoded = tf.keras.layers.Dense(input_dim, activation='relu', kernel_regularizer=regularizer)(cur)
 
         self._model = tf.keras.models.Model(self._input_layer, decoded)
-        self._model.compile(optimizer='adam', loss='mean_squared_error')
+        # Trying training with data_masking.
+        self._model.compile(optimizer='adam', loss=MaskedMSE())
         self._encoder = None
 
     def load_weights(self, file_path):
@@ -103,11 +104,12 @@ class Autoencoder:
     def reconstruction_error(self, x_test):
         """
         Accepts 2d array of feature vectors as input, gets reconstruction error of each data point.
+        Masks out padded features values, i.e. elements where original data is zero is ignored.
         :param x_test:
         :return:
         """
         reconstructions = self._model.predict(x_test)
-        errors = np.sum((reconstructions - x_test) ** 2, axis=1)
+        errors = np.sum((reconstructions - x_test) ** 2 * (~(x_test == 0)), axis=1)
 
         return errors
 
@@ -115,3 +117,17 @@ class Autoencoder:
         encodings = self._encoder.predict(x_test)
         return encodings
 
+
+class MaskedMSE(tf.keras.losses.Loss):
+    """
+    Modified MSE loss function with padded feature values masked out.
+    Use this for variable-input-length autoencoder that uses masking
+    """
+    def __init__(self, name="masked_mean_square_error"):
+        super().__init__(name=name)
+
+    def call(self, y_true, y_pred):
+        # Assuming y_true and y_pred have the same shape
+        mask = tf.cast(tf.not_equal(y_true, 0), dtype=tf.float32)  # Mask for non-zero values
+        mse = tf.reduce_sum(tf.square(y_true - y_pred) * mask) / tf.maximum(tf.reduce_sum(mask), 1.0)
+        return mse
