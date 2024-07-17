@@ -3,6 +3,7 @@
 __pycache__/
 models/
 playground_file.py
+playground_2.py
 file_paths.py
 *.root
 *.csv
