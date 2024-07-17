@@ -35,7 +35,7 @@ class Autoencoder:
             cur = tf.keras.layers.Dense(architecture[i], activation=tf.keras.layers.LeakyReLU(alpha=0.01), kernel_regularizer=regularizer)(prev)
             prev = cur
         # decoded = tf.keras.layers.Dense(8, activation='relu')(self._encoding_layer)
-        decoded = tf.keras.layers.Dense(input_dim, activation='relu', kernel_regularizer=regularizer)(cur)
+        decoded = tf.keras.layers.Dense(input_dim, activation=tf.keras.layers.LeakyReLU(alpha=0.001), kernel_regularizer=regularizer)(cur)
 
         # Now, time to compile model. Apply data masking if requested
         self._model = tf.keras.models.Model(self._input_layer, decoded)
@@ -68,8 +68,7 @@ class Autoencoder:
             epochs=epochs,
             batch_size=batch_size,
             shuffle=True,
-            validation_data=(x_valid, x_valid),
-            callbacks=[early_stopping])
+            validation_data=(x_valid, x_valid))
         self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
 
         if plot_valid_loss:
@@ -114,14 +113,18 @@ class Autoencoder:
         :param x_test:
         :return:
         """
-        reconstructions = self._model.predict(x_test)
-        errors = np.sum((reconstructions - x_test) ** 2 * (~(x_test == 0)), axis=1)
+        x_test_no_nan = np.nan_to_num(x_test, nan=0)
+        reconstructions = self._model.predict(x_test_no_nan)
+        errors = np.sum((reconstructions - x_test_no_nan) ** 2 * (~(np.isnan(x_test))), axis=1)
 
         return errors
 
     def get_encodings(self, x_test):
         encodings = self._encoder.predict(x_test)
         return encodings
+
+    def save_weights(self, file_path):
+        self._model.save_weights(file_path)
 
 
 class MaskedMSE(tf.keras.losses.Loss):
@@ -133,7 +136,10 @@ class MaskedMSE(tf.keras.losses.Loss):
         super().__init__(name=name)
 
     def call(self, y_true, y_pred):
-        # Assuming y_true and y_pred have the same shape
-        mask = tf.cast(tf.not_equal(y_true, 0), dtype=tf.float32)  # Mask for non-zero values
-        mse = tf.reduce_sum(tf.square(y_true - y_pred) * mask) / tf.maximum(tf.reduce_sum(mask), 1.0)
+        mask = tf.math.logical_not(tf.math.is_nan(y_true))  # Mask for non-NaN values
+        y_true = tf.where(mask, y_true, tf.zeros_like(y_true))  # Replace NaNs in y_true with 0s
+        y_pred = tf.where(mask, y_pred, tf.zeros_like(y_pred))  # Replace NaNs in y_pred with 0s
+        squared_difference = tf.square(y_true - y_pred)
+        masked_squared_difference = tf.where(mask, squared_difference, tf.zeros_like(squared_difference))
+        mse = tf.reduce_sum(masked_squared_difference) / tf.maximum(tf.reduce_sum(tf.cast(mask, tf.float32)), 1.0)
         return mse

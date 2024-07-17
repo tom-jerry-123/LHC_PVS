@@ -17,7 +17,7 @@ from vertex_density_calc import density_from_z_coord
 Variables to use
 """
 FEAT_FOLDER = "50_track_batches"
-TTBAR_PT_FILE = "50_track_ttbar_pt_"
+TTBAR_FEAT_FILE = "50_track_ttbar_pt_dR_"
 TTBAR_Z_FILE = "50_track_ttbar_z_"
 VBF_PT_FILE = "50_track_vbf_pt_"
 VBF_Z_FILE = "50_track_vbf_z_"
@@ -28,7 +28,7 @@ VBF_SUM_PT2 = "vbf_sum_pt2_"
 
 
 TRAINING_BATCH_RANGE = (0, 8)
-TESTING_BATCH_RANGE = (8, 12)
+TESTING_BATCH_RANGE = (8, 15)
 BATCH_SIZE = 500
 
 
@@ -92,6 +92,7 @@ def run_rec_err_model(autoencoder, folder, file):
     # Plot log errors
     # Random sample indices for pu vertices (we don't want to plot all of them, or else it'll be too cluttered)
     rand_pu_idxs = np.random.choice(len(pu_err), int(len(pu_err) * 0.05), replace=False)
+    pu_err = pu_err[rand_pu_idxs]
     plot_log_reco_err(pu_err, ttbar_hs_err)
     # plot err vs pt2
     # plot_err_vs_pt2(err_lst=[pu_err[rand_pu_idxs], ttbar_hs_err],
@@ -127,9 +128,15 @@ def run_density_eff_test(autoencoder):
     """
 
     # Load training, testing data
-    ttbar_train, ttbar_x, ttbar_y = load_train_test(FEAT_FOLDER + "/" + TTBAR_PT_FILE, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+    ttbar_train, ttbar_x, ttbar_y = load_train_test(FEAT_FOLDER + "/" + TTBAR_FEAT_FILE, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
     # vbf_train, vbf_x, vbf_y = load_train_test(FEAT_FOLDER + "/" + VBF_PT_FILE, TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
     # x_train = np.vstack((ttbar_train, vbf_train))
+
+    # Now, compute 1 / delta_r
+    dR_feat_mask = np.array([i % 2 for i in range(100)]).astype(bool)
+    ttbar_x[dR_feat_mask & (ttbar_x != 0)] = 1 / ttbar_x[dR_feat_mask & (ttbar_x != 0)]
+    ttbar_train[dR_feat_mask & (ttbar_train != 0)] = 1 / ttbar_train[dR_feat_mask & (ttbar_train != 0)]
+
 
     # Load data for pt2
     ttbar_pt2, _trash = load_data(PT2_FOLDER + "/" + TTBAR_SUM_PT2, TESTING_BATCH_RANGE)
@@ -154,13 +161,17 @@ def run_density_eff_test(autoencoder):
 
     # Train the autoencoder
     model = autoencoder
-    model.train_model(ttbar_train, epochs=20, plot_valid_loss=False)
+    model.train_model(ttbar_train, epochs=100, plot_valid_loss=False)
+
+    # Save model weights
+    model.save_weights("models/pt_1-by-dR_model.h5")
+
     ttbar_err = model.reconstruction_error(ttbar_x)
     # vbf_err = model.reconstruction_error(vbf_x)
 
     # Get efficiencies for TTBAR
-    pt2_ttbar_eff, pt2_ttbar_midpts, pt2_ttbar_std = get_efficiencies_vs_density(ttbar_pt2, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, num_bins=10, plot_hist=True, algo_name="Sum-pt2")
-    enc_ttbar_eff, enc_ttbar_midpts, enc_ttbar_std = get_efficiencies_vs_density(ttbar_err, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, plot_hist=True, algo_name="Autoencoder")
+    pt2_ttbar_eff, pt2_ttbar_midpts, pt2_ttbar_std = get_efficiencies_vs_density(ttbar_pt2, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, num_bins=10, plot_hist=False, algo_name="Sum-pt2")
+    enc_ttbar_eff, enc_ttbar_midpts, enc_ttbar_std = get_efficiencies_vs_density(ttbar_err, ttbar_y, ttbar_reco_z, ttbar_hs_truth_z, plot_hist=False, algo_name="Autoencoder")
 
     # Get the efficiencies for VBF
     # pt2_vbf_eff, pt2_vbf_midpts, pt2_vbf_std = get_efficiencies_vs_density(vbf_pt2, vbf_y, vbf_reco_z, vbf_hs_truth_z, algo_name="Sum-pt2")
@@ -172,10 +183,37 @@ def run_density_eff_test(autoencoder):
     # line_plot([pt2_vbf_midpts], [pt2_vbf_eff], [pt2_vbf_std], labels=['Sum-pt2'], title="Efficiency vs. Density for VBF", xlabel="Vertex Density",
     #           ylabel="Efficiency", ylim=(0.7, 1.0))
 
+    # Print Average Efficiency Scores
+    print("\n*** Printing Recall Scores ***")
+    print(f"{'':10} {'ENCODER':10} {'SUM-PT2':10}")
+    print(f"{'TTBAR':10} {np.mean(enc_ttbar_eff):<10.4f} {np.mean(pt2_ttbar_eff):<10.4f}")
+
+    # separate pu and hs errors for plotting
+    ttbar_mask = ttbar_y == 1
+    pu_err = ttbar_err[~ttbar_mask]
+    ttbar_hs_err = ttbar_err[ttbar_mask]
+    pu_pt2 = ttbar_pt2[~ttbar_mask]
+    hs_pt2 = ttbar_pt2[ttbar_mask]
+
+    # Plot log errors
+    # Random sample indices for pu vertices (we don't want to plot all of them, or else it'll be too cluttered)
+    rand_pu_idxs = np.random.choice(len(pu_err), 5000, replace=False)
+    pu_err = pu_err[rand_pu_idxs]
+    pu_pt2 = pu_pt2[rand_pu_idxs]
+    plot_log_reco_err(pu_err, ttbar_hs_err)
+
+    plot_err_vs_pt2([pu_err, ttbar_hs_err], [pu_pt2, hs_pt2], ["PU", "HS"])
+
+
+
 
 def quick_model_diagnostic(autoencoder: Autoencoder):
     # Load training, testing data
     ttbar_train, ttbar_x, ttbar_y = load_train_test("50_track_batches/50_track_ttbar_pt_", TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+
+    # Replace zeros with nan
+    ttbar_train = np.where(ttbar_train == 0, np.nan, ttbar_train)
+    ttbar_x = np.where(ttbar_x == 0, np.nan, ttbar_x)
 
     model = autoencoder
     model.train_model(ttbar_train, epochs=10, plot_valid_loss=True)
@@ -192,5 +230,5 @@ def quick_model_diagnostic(autoencoder: Autoencoder):
 
 
 if __name__ == "__main__":
-    run_density_eff_test(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization=None))
+    run_density_eff_test(Autoencoder(input_dim=100, code_dim=3, architecture=(58,7), regularization="L2"))
     # quick_model_diagnostic(Autoencoder(input_dim=50, code_dim=3, architecture=(32,), regularization=None))
