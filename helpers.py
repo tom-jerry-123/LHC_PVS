@@ -99,3 +99,16 @@ def get_efficiencies_vs_density(algo_scores, y_data, reco_zs, hs_truth_zs, num_b
     eff_std = np.sqrt(efficiencies * (1 - efficiencies) / yhat_freq)
 
     return efficiencies, midpoints, eff_std
+
+
+def event_partition(y_data, *args):
+    split_idxs = np.where(y_data == 1)[0]
+    # Splitting will generate empty subarray at start since first split index at 0; remove that empty arr
+    partitioned_y = np.split(y_data, split_idxs)[1:]
+    return_data_lst = [partitioned_y]
+    for i, data_arr in enumerate(args):
+        return_data_lst.append(np.split(data_arr, split_idxs)[1:])
+
+    return return_data_lst
+
+

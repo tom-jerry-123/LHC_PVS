@@ -58,17 +58,14 @@ class Autoencoder:
             patience=3,
             verbose=1,
             restore_best_weights=True)
-        checkpoint_path = "models/model_checkpoint_{epoch:02d}.h5"  # Filepath with epoch number placeholder
-        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            save_weights_only=True,  # Set to True to save only model weights
-            verbose=1)
         history = self._model.fit(
             x_train, x_train,
             epochs=epochs,
             batch_size=batch_size,
             shuffle=True,
-            validation_data=(x_valid, x_valid))
+            validation_data=(x_valid, x_valid),
+            callbacks=early_stopping
+        )
         self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
 
         if plot_valid_loss:
@@ -105,6 +102,9 @@ class Autoencoder:
         new_x_train = x_train[remainder_indices]
 
         return new_x_train, x_valid
+
+    def reconstructions(self, x_test):
+        return self._model.predict(x_test)
 
     def reconstruction_error(self, x_test):
         """

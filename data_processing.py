@@ -10,6 +10,7 @@ from file_paths import *
 import numpy as np
 import uproot
 import csv
+from data_loading import load_data, load_csv
 
 
 """
@@ -306,19 +307,49 @@ def read_features_to_csv(tree, out_path, n_tracks, event_range):
     print(f"Successfully saved data batch to '{out_path}'")
 
 
+def make_supervised_sample():
+    """
+    Makes a sample for supervised learning by the autoencoder
+    Uses first 8 batches from ttbar pt data
+    :return:
+    """
+    # Load data
+    x_data, y_data = load_data("50_track_batches/50_track_ttbar_pt_", (0, 8))
+
+    # Now, randomly select 16000 pu vertices and 16000 hs vertices (hs vertices upsampled)
+    hs_mask = y_data == 1
+    hs_data = x_data[hs_mask]
+    pu_data = x_data[~hs_mask]
+    pu_idxs = np.random.choice(pu_data.shape[0], 16000, replace=False)
+    selected_pu = pu_data[pu_idxs, :]
+    hs_idxs = np.random.choice(hs_data.shape[0], selected_pu.shape[0], replace=True)
+    selected_hs = hs_data[hs_idxs, :]
+
+    # Now, concatenate and shuffle data
+    selected_hs = np.column_stack((selected_hs, np.ones(selected_hs.shape[0], dtype='float32')))
+    selected_pu = np.column_stack((selected_pu, np.zeros(selected_pu.shape[0], dtype='float32')))
+    final_data = np.vstack((selected_hs, selected_pu))
+    permute_idxs = np.random.choice(final_data.shape[0], final_data.shape[0], replace=False)
+    final_data = final_data[permute_idxs]
+
+    # Write to csv
+    np.savetxt("supervised_ttbar_train.csv", final_data, delimiter=",", fmt="%.4f",
+               header="Top 50 pts of each vertex (zero-padding). Last column is label.")
+
 
 
 if __name__ == "__main__":
-    # compute_track_pt(VBF_ROOT_PATH, "other_data_files/track_pt_vbf_8000-16000.csv", (8000, 16000))
-    BATCH_SIZE = 500
-    N_TRACKS = 50
-    # track_pts = load_pt("other_data_files/track_pt_vbf.csv")
-    # new_track_pts = load_pt("other_data_files/track_pt_vbf_8000-16000.csv")
-    # track_pts.extend(new_track_pts)
-    # print("Successfully loaded all track pts.")
-    with uproot.open(file_paths.ROOT_PATH) as file:
-        tree = file["EventTree;1"]
-        print("Successfully loaded tree")
-    for k in range(0, 15):
-        event_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
-        read_features_to_csv(tree, f"50_track_batches/50_track_ttbar_pt_dR_{k}.csv", n_tracks=N_TRACKS, event_range=event_range)
+    # # compute_track_pt(VBF_ROOT_PATH, "other_data_files/track_pt_vbf_8000-16000.csv", (8000, 16000))
+    # BATCH_SIZE = 500
+    # N_TRACKS = 50
+    # # track_pts = load_pt("other_data_files/track_pt_vbf.csv")
+    # # new_track_pts = load_pt("other_data_files/track_pt_vbf_8000-16000.csv")
+    # # track_pts.extend(new_track_pts)
+    # # print("Successfully loaded all track pts.")
+    # with uproot.open(file_paths.ROOT_PATH) as file:
+    #     tree = file["EventTree;1"]
+    #     print("Successfully loaded tree")
+    # for k in range(0, 15):
+    #     event_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
+    #     read_features_to_csv(tree, f"50_track_batches/50_track_ttbar_pt_dR_{k}.csv", n_tracks=N_TRACKS, event_range=event_range)
+    make_supervised_sample()
