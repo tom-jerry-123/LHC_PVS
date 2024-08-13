@@ -16,7 +16,7 @@ from vertex_density_calc import density_from_z_coord
 """
 Variables to use
 """
-FEAT_FOLDER = "50_track_batches"
+FEAT_FOLDER = "50_track_batches_old"
 TTBAR_FEAT_FILE = "50_track_ttbar_pt_"
 TTBAR_Z_FILE = "50_track_ttbar_z_"
 VBF_PT_FILE = "50_track_vbf_pt_"
@@ -193,8 +193,9 @@ def run_density_eff_test(autoencoder):
 
 
 def quick_model_diagnostic(autoencoder: Autoencoder):
+    # Light-weight testing for autoencoder
     # Load training, testing data
-    ttbar_train, ttbar_x, ttbar_y = load_train_test("50_track_batches/50_track_ttbar_pt_", TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
+    ttbar_train, ttbar_x, ttbar_y = load_train_test("50_track_batches_old/50_track_ttbar_pt_", TRAINING_BATCH_RANGE, TESTING_BATCH_RANGE)
 
 
     model = autoencoder
@@ -210,6 +211,23 @@ def quick_model_diagnostic(autoencoder: Autoencoder):
     pu_errs = errors[~y_mask]
 
     plot_log_reco_err(pu_errs, hs_errs)
+
+
+def run_experiment():
+    """
+    Main function for running the experiments
+    :return:
+    """
+    # load data
+    ttbar_data, ttbar_y = load_csv("data_batches/ttbar_small_500e.csv")
+    # Note: after here, ttbar y is only for testing data
+    ttbar_train_set, ttbar_test_set, ttbar_y = train_test_split(ttbar_data, ttbar_y, split_e_num=300, remove_training_hs=True)
+    # split into features
+    pt_idxs = np.arange(0, 100, 2)
+    ttbar_train = ttbar_train_set[:, pt_idxs]
+    ttbar_X = ttbar_test_set[:, pt_idxs]
+    ttbar_reco_z = ttbar_test_set[:, 100]
+    # Load truth zs
 
 
 if __name__ == "__main__":

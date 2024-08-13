@@ -6,11 +6,11 @@ noticed artifact in data: last vertex has zero pt, same coordinates as HS vertex
 removing last vertex in data from data processing
 """
 import file_paths
-from file_paths import *
 import numpy as np
 import uproot
 import csv
 from data_loading import load_data, load_csv
+from helpers import event_partition
 
 
 """
@@ -337,8 +337,71 @@ def make_supervised_sample():
                header="Top 50 pts of each vertex (zero-padding). Last column is label.")
 
 
+def compute_event_masks():
+    with uproot.open(file_paths.ROOT_PATH) as file:
+        ttbar_tree = file["EventTree;1"]
+        print("Successfully loaded TTBAR tree")
+    with uproot.open(file_paths.VBF_ROOT_PATH) as file:
+        vbf_tree = file["EventTree;1"]
+        print("Successfully loaded VBF tree")
+    ttbar_jet_pts = ttbar_tree["jet_pt"].array()
+    vbf_jet_pts = vbf_tree["jet_pt"].array()
+
+    N_EVENTS = 7500
+    ttbar_exclude_idxs = []
+    vbf_exclude_idxs = []
+    # Find all the events to exclude for ttbar and vbf
+    for i in range(N_EVENTS):
+        if np.sum(ttbar_jet_pts[i] >= 30.0) < 2:
+            ttbar_exclude_idxs.append(i)
+        if np.sum(vbf_jet_pts[i] >= 30.0) < 2:
+            vbf_exclude_idxs.append(i)
+    ttbar_exclude_idxs = np.array(ttbar_exclude_idxs)
+    vbf_exclude_idxs = np.array(vbf_exclude_idxs)
+    # Create boolean (zero-one) mask indicating valid events
+    vbf_include_mask = np.ones(N_EVENTS)
+    ttbar_include_mask = np.ones(N_EVENTS)
+    vbf_include_mask[vbf_exclude_idxs] = 0
+    ttbar_include_mask[ttbar_exclude_idxs] = 0
+
+    # save the masks
+    np.savetxt("other_data_files/event_inclusion_mask.csv", np.vstack((ttbar_include_mask, vbf_include_mask)), delimiter=',',
+               header="First Row is TTBAR mask, second is VBF mask", fmt="%d")
+
+
+def filter_events(outpath):
+    """
+    Using this to create new data files from older ones
+    :return:
+    """
+    # Load necessary data
+    ttbar_data, y_data = load_data("50_track_batches_old/50_track_ttbar_pt_dR_", (0, 15))
+    reco_z_data, _trash = load_data("50_track_batches_old/50_track_ttbar_z_", (0, 15))
+    event_masks, _trash = load_csv("other_data_files/event_inclusion_mask.csv", has_headers=True, has_y=False)
+    # Type cast, and, if fewer events are loaded, only keep relevant part of event mask
+    event_masks = event_masks.astype(bool)
+    ttbar_mask = event_masks[0, :]
+    y_data = y_data.astype(int)
+    # Combine data. Last column is event index (starting from zero)
+    X_data = np.column_stack((ttbar_data, reco_z_data, np.cumsum(y_data) - 1))
+    # Partition over events
+    part_y_data, part_X_data = event_partition(y_data, X_data)
+    # Select the events to keep based on event mask
+    kept_y_data = [sub_array for sub_array, mask in zip(part_y_data, ttbar_mask) if mask]
+    kept_X_data = [sub_array for sub_array, mask in zip(part_X_data, ttbar_mask) if mask]
+    # Concatenate data and write to csv
+    final_y_data = np.concatenate(kept_y_data)
+    final_X_data = np.concatenate(kept_X_data, axis=0)
+    final_data = np.column_stack((final_X_data, final_y_data))
+    headers = "First 100 columns pt and min dR alternating (pt0, dr0, pt1, dr1, etc.). 101st column reco z, 102nd event_#, 103rd y"
+    np.savetxt(outpath, final_data, delimiter=",", header=headers, fmt="%.4f")
+
+
 
 if __name__ == "__main__":
+    # with uproot.open(file_paths.ROOT_PATH) as file:
+    #     tree = file["EventTree;1"]
+    #     print("Successfully loaded tree")
     # # compute_track_pt(VBF_ROOT_PATH, "other_data_files/track_pt_vbf_8000-16000.csv", (8000, 16000))
     # BATCH_SIZE = 500
     # N_TRACKS = 50
@@ -346,10 +409,9 @@ if __name__ == "__main__":
     # # new_track_pts = load_pt("other_data_files/track_pt_vbf_8000-16000.csv")
     # # track_pts.extend(new_track_pts)
     # # print("Successfully loaded all track pts.")
-    # with uproot.open(file_paths.ROOT_PATH) as file:
-    #     tree = file["EventTree;1"]
-    #     print("Successfully loaded tree")
+
     # for k in range(0, 15):
     #     event_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
     #     read_features_to_csv(tree, f"50_track_batches/50_track_ttbar_pt_dR_{k}.csv", n_tracks=N_TRACKS, event_range=event_range)
-    make_supervised_sample()
+    # compute_event_masks()
+    filter_events(outpath="data_batches/ttbar_big_7500e.csv")
