@@ -126,6 +126,16 @@ class Autoencoder:
     def save_weights(self, file_path):
         self._model.save_weights(file_path)
 
+    def save_model(self, file_path: str):
+        """
+        Saves whole model to specified file_path as .keras zip
+        :param file_path: path to save to. Should be .keras extension or no extension
+        :return:
+        """
+        if not file_path.endswith(".keras"):
+            file_path += ".keras"
+        self._model.save(file_path)
+
 
 class MaskedMSE(tf.keras.losses.Loss):
     """

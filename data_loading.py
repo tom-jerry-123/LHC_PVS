@@ -65,7 +65,7 @@ def train_test_split(X_data, y_data, split_e_num=-1, remove_training_hs=True):
     """
     split_idxs = np.where(y_data == 1)[0]
     N_events = len(split_idxs)
-    if split_e_num < 0 or split_idxs > N_events:
+    if split_e_num < 0 or split_e_num > N_events:
         split_e_num = N_events // 2
     split_idx = split_idxs[split_e_num]
     X_test = X_data[split_idx:, :]
