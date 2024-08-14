@@ -300,7 +300,6 @@ def run_experiment():
     evaluate_results(ttbar_pt2, ttbar_errs, ttbar_y, ttbar_reco_zs, ttbar_hs_zs, model_name="Autoencoder", dataset_name="TTBAR")
 
 
-
 if __name__ == "__main__":
     """
     Architectures:
