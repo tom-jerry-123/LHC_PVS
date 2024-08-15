@@ -9,7 +9,7 @@ import file_paths
 import numpy as np
 import uproot
 import csv
-from data_loading import load_data, load_csv
+from data_loading import load_data, load_csv, read_truth_hs_z
 from helpers import event_partition
 
 
@@ -296,7 +296,7 @@ def read_features_to_csv(tree, n_tracks, event_range, pt_path, out_path="", ret_
             else:
                 vertex_pt_R = np.pad(vertex_pt_R, (0, n_tracks*2 - len(vertex_pt_R)), mode='constant')
             vertex_data.append(vertex_pt_R)
-        if i % 100 == 0:
+        if i % 100 == 99:
             print(f"Done event {i}.")
 
     final_data = np.column_stack((np.array(vertex_data), labels))
@@ -339,7 +339,7 @@ def make_supervised_sample():
     final_data = final_data[permute_idxs]
 
     # Write to csv
-    np.savetxt("supervised_ttbar_train.csv", final_data, delimiter=",", fmt="%.4f",
+    np.savetxt("supervised_ttbar_train.csv", final_data, delimiter=",",
                header="Top 50 pts of each vertex (zero-padding). Last column is label.")
 
 
@@ -391,7 +391,7 @@ def old_ttbar_loading_wrapper():
 
 
 def old_vbf_loading_wrapper():
-    reco_z_data, y_data = load_data("50_track_batches_old/50_track_vbf_z_", batch_range=(0, 1))
+    reco_z_data, y_data = load_data("50_track_batches_old/50_track_vbf_z_", batch_range=(0, 15))
     event_masks, _trash = load_csv("other_data_files/event_inclusion_mask.csv", has_headers=True, has_y=False)
     # Type cast, and, if fewer events are loaded, only keep relevant part of event mask
     event_masks = event_masks.astype(bool)
@@ -401,7 +401,8 @@ def old_vbf_loading_wrapper():
     with uproot.open(file_paths.VBF_ROOT_PATH) as file:
         tree = file["EventTree;1"]
         print("Successfully loaded vbf tree")
-    vbf_pt_dr = read_features_to_csv(tree, 50, (0, 500), out_path="data_batches/vbf_small_500e.csv", ret_with_labels=False)
+    vbf_pt_dr = read_features_to_csv(tree, 50, (0, 7500), pt_path="other_data_files/track_pt_vbf.csv",
+                                     out_path="", ret_with_labels=False)
     # Combine data. Last column is event index
     X_data = np.column_stack((vbf_pt_dr, reco_z_data, np.cumsum(y_data) - 1))
 
@@ -422,13 +423,13 @@ def filter_events(X_data, y_data, e_mask, outpath):
     np.savetxt(outpath, final_data, delimiter=",", header=headers, fmt="%.4f")
 
 
-def event_filter_wrapper(outpath, TTBAR):
+def event_filter_wrapper(outpath, ttbar):
     """
     Using this to create new data files from older ones
     Switch loading code depending on whether we're processing ttbar or vbf
     :return:
     """
-    if TTBAR:
+    if ttbar:
         X_data, y_data, e_mask = old_ttbar_loading_wrapper()  # for loading old ttbar data
     else:
         X_data, y_data, e_mask = old_vbf_loading_wrapper()  # for loading old vbf data
@@ -453,4 +454,6 @@ if __name__ == "__main__":
     #     event_range = (k*BATCH_SIZE, k*BATCH_SIZE + BATCH_SIZE)
     #     read_features_to_csv(tree, f"50_track_batches/50_track_ttbar_pt_dR_{k}.csv", n_tracks=N_TRACKS, event_range=event_range)
     # compute_event_masks()
-    filter_events(outpath="data_batches/ttbar_big_7500e.csv")
+    # event_filter_wrapper(outpath="data_batches/vbf_big_7500e.csv", ttbar=False)
+    read_truth_hs_z(file_paths.ROOT_PATH, 0, 7500, "data_batches/ttbar_hs_truth_z.csv", ttbar=True)
+    read_truth_hs_z(file_paths.VBF_ROOT_PATH, 0, 7500, "data_batches/vbf_hs_truth_z.csv", ttbar=False)

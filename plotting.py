@@ -132,7 +132,7 @@ def plot_reco_err(pu_errors, hs_errors, xlim=None, num_bins=100, save_path=None)
     plt.show()
 
 
-def plot_log_reco_err(pu_errors, hs_errors, hs_errs_2 = None):
+def plot_log_reco_err(pu_errors, hs_errors, hs_errs_2 = None, dataset_name=""):
     log_pu_err = np.log(pu_errors + 1e-9)
     log_hs_err = np.log(hs_errors + 1e-9)
 
@@ -160,11 +160,11 @@ def plot_log_reco_err(pu_errors, hs_errors, hs_errs_2 = None):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
 
-    plt.title('Histogram of Two Datasets')
+    plt.title('Log Reco Error for ' + dataset_name)
     plt.show()
 
 
-def plot_err_vs_pt2(err_lst, pt_lst, labels=None):
+def plot_err_vs_pt2(err_lst, pt_lst, labels=None, dataset_name=""):
     color_lst = ["blue", "red", "green"]
     N_colors = len(color_lst)
     if len(err_lst) != len(pt_lst):
@@ -179,6 +179,7 @@ def plot_err_vs_pt2(err_lst, pt_lst, labels=None):
     plt.xscale('log')
     plt.tick_params(axis='both', which='major', labelsize=16)
     plt.legend(fontsize=18)
+    plt.title("Reco Err vs Sum-pt2 for " + dataset_name)
     plt.show()
 
 
