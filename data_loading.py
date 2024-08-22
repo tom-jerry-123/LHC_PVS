@@ -56,10 +56,36 @@ def load_train_test(file_path, train_range, test_range):
     return training_data, x_test, y_test
 
 
-def load_truth_hs_z(root_file_path, start, end):
+def train_test_split(X_data, y_data, split_idx_num=-1, remove_training_hs=True, truth_hs_data=None):
     """
-    Temporary solution for extracting HS vertex z-coordinates.
-    May instead store these coords in csv in future
+    Different from load_train_test above in that it takes all the data (from input arrays X_data, y_data),
+    splits it into training and testing sets based on training events and testing events
+
+    Returns X_train (PU only), X_test, y_test
+    :return:
+    """
+    split_idxs = np.where(y_data == 1)[0]
+    N_events = len(split_idxs)
+    if split_idx_num < 0 or split_idx_num > N_events:
+        split_idx_num = N_events // 2
+    split_idx = split_idxs[split_idx_num]
+    X_test = X_data[split_idx:, :]
+    y_test = y_data[split_idx:]
+    X_train = X_data[:split_idx, :]
+    if remove_training_hs:
+        X_train = X_train[y_data[:split_idx] == 0]
+    if truth_hs_data is not None:
+        truth_hs_zs = truth_hs_data[:, 0]
+        end_e_num = X_test[-1, -1]
+        end_idx = np.where(truth_hs_data[:, 1] == end_e_num)[0][0] + 1
+        truth_hs_zs = truth_hs_zs[split_idx_num: end_idx]
+        return X_train, X_test, y_test, truth_hs_zs
+    return X_train, X_test, y_test
+
+
+def read_truth_hs_z(root_file_path, start, end, outpath="", ttbar=True):
+    """
+    Compiles actual z coordinates of hs vertex and returns it. Stores to csv is outpath specified
     :param root_file_path:
     :param start: start index of event
     :param end: index after final event to load
@@ -73,5 +99,26 @@ def load_truth_hs_z(root_file_path, start, end):
     hs_z_coords = []
     for i in range(start, end):
         hs_z_coords.append(truth_z_array[i][0])
+    hs_z_coords = np.array(hs_z_coords)
 
-    return np.array(hs_z_coords)
+    # Load event mask
+    event_mask, _trash = load_csv("other_data_files/event_inclusion_mask.csv", has_y=False)
+    if ttbar:
+        event_mask = event_mask[0, start:end]
+    else:
+        event_mask = event_mask[1, start:end]
+    event_mask = event_mask.astype(bool)
+
+    # write to
+    if outpath != "":
+        event_nums = np.arange(start, end)
+        data = np.column_stack((hs_z_coords, event_nums))
+        data = data[event_mask]
+        np.savetxt(outpath, data, delimiter=',', header="hs_truth_z, event_#", fmt="%.4f")
+
+    return hs_z_coords[event_mask]
+
+
+def load_truth_hs_z(csv_path):
+    data, _trash = load_csv(csv_path, has_y=False)
+    return data

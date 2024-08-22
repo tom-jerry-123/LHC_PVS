@@ -4,11 +4,11 @@ File for Autoencoder class. Creates simple autoencoder
 
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 class Autoencoder:
-    def __init__(self, input_dim=50, code_dim=3, architecture=(32,), regularization=None, masking=False):
+    def __init__(self, model_path="", input_dim=50, code_dim=3, architecture=(32,), regularization=None, masking=False):
         # Set regularization
         if regularization == "l2" or regularization == "L2":
             regularizer = tf.keras.regularizers.l2(0.005)
@@ -58,17 +58,14 @@ class Autoencoder:
             patience=3,
             verbose=1,
             restore_best_weights=True)
-        checkpoint_path = "models/model_checkpoint_{epoch:02d}.h5"  # Filepath with epoch number placeholder
-        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            save_weights_only=True,  # Set to True to save only model weights
-            verbose=1)
         history = self._model.fit(
             x_train, x_train,
             epochs=epochs,
             batch_size=batch_size,
             shuffle=True,
-            validation_data=(x_valid, x_valid))
+            validation_data=(x_valid, x_valid),
+            callbacks=early_stopping
+        )
         self._encoder = tf.keras.models.Model(self._input_layer, self._encoding_layer)
 
         if plot_valid_loss:
@@ -106,6 +103,9 @@ class Autoencoder:
 
         return new_x_train, x_valid
 
+    def reconstructions(self, x_test):
+        return self._model.predict(x_test)
+
     def reconstruction_error(self, x_test):
         """
         Accepts 2d array of feature vectors as input, gets reconstruction error of each data point.
@@ -125,6 +125,20 @@ class Autoencoder:
 
     def save_weights(self, file_path):
         self._model.save_weights(file_path)
+
+    def save_model(self, file_path: str):
+        """
+        Saves whole model to specified file_path as .keras zip
+        :param file_path: path to save to. Should be .keras extension or no extension
+        :return:
+        """
+        if not file_path.endswith(".keras"):
+            file_path += ".keras"
+        self._model.save(file_path)
+
+    def load_model(self, model_path):
+        self._model = tf.keras.models.load_model(model_path, custom_objects={'LeakyReLU': tf.keras.layers.LeakyReLU})
+        print("Done Loading Model")
 
 
 class MaskedMSE(tf.keras.losses.Loss):
