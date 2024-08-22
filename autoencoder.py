@@ -4,11 +4,11 @@ File for Autoencoder class. Creates simple autoencoder
 
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 class Autoencoder:
-    def __init__(self, input_dim=50, code_dim=3, architecture=(32,), regularization=None, masking=False):
+    def __init__(self, model_path="", input_dim=50, code_dim=3, architecture=(32,), regularization=None, masking=False):
         # Set regularization
         if regularization == "l2" or regularization == "L2":
             regularizer = tf.keras.regularizers.l2(0.005)
@@ -135,6 +135,10 @@ class Autoencoder:
         if not file_path.endswith(".keras"):
             file_path += ".keras"
         self._model.save(file_path)
+
+    def load_model(self, model_path):
+        self._model = tf.keras.models.load_model(model_path, custom_objects={'LeakyReLU': tf.keras.layers.LeakyReLU})
+        print("Done Loading Model")
 
 
 class MaskedMSE(tf.keras.losses.Loss):

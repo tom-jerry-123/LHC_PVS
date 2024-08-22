@@ -1,6 +1,8 @@
 """
 Used to diagnose model bugs
 """
+import keras
+import tensorflow as tf
 import numpy as np
 
 from autoencoder import Autoencoder
@@ -9,6 +11,7 @@ from plotting import *
 from helpers import *
 import file_paths
 from vertex_density_calc import density_from_z_coord
+from experiments import data_loading_wrapper
 
 
 """
@@ -112,7 +115,7 @@ def code_dim_test(ttbar_train, ttbar_x, ttbar_y, ttbar_pt2, ttbar_reco_z, ttbar_
               ylabel="Efficiency")
 
 
-def gather_encoder_mistakes(model, pt2, x_data, y_data, reco_zs, hs_truth_zs, start_event_num, outfile_prefix="", via_dist=False):
+def gather_encoder_mistakes(model, pt2, x_data, y_data, reco_zs, hs_truth_zs, event_nums, outfile_prefix="", via_dist=False):
     rec_vecs = model.reconstructions(x_data)
     rec_errs = np.sum((rec_vecs - x_data) ** 2, axis=1)
     enc_yhat = get_classification(rec_errs, y_data)
@@ -125,40 +128,41 @@ def gather_encoder_mistakes(model, pt2, x_data, y_data, reco_zs, hs_truth_zs, st
     mistake_rec_x = []  # reconstruction of mistakenly chosen vertex
     correct_x = []
     correct_rec_x = []  # reconstruction of correct vertex
-    event_nums = []
+    mistake_event_nums = []
     vertex_nums = []
     other_data = []  # stores: mistake rec err, correct rec err, selected z, correct reco z, truth reco z, vertex num, event num
 
-    e_y, e_enc_yhat, e_pt2_yhat, e_x, e_rec_vecs, e_rec_errs, e_pt2 = event_partition(y_data, enc_yhat, pt2_yhat, x_data, rec_vecs, rec_errs, pt2)
+    e_y, e_enc_yhat, e_pt2_yhat, e_x, e_rec_vecs, e_rec_errs, e_pt2, e_event_nums = event_partition(y_data, enc_yhat, pt2_yhat, x_data, rec_vecs, rec_errs, pt2, event_nums)
     N_events = len(hs_truth_zs)
     for i in range(N_events):
         vertex_num = np.where(e_enc_yhat[i] == 1)[0][0]
         cur_x = e_x[i]
         cur_enc_z = enc_selected_zs[i]
         cur_hs_z = hs_truth_zs[i]
+        cur_e_num = e_event_nums[i][0]
         # check if each algorithm has selected successfully
         enc_unsuccessful = abs(cur_enc_z - cur_hs_z) > 1 if via_dist else vertex_num != 0
-        pt2_successful = abs(pt2_selected_zs[i] - cur_hs_z) > 1 if via_dist else e_pt2_yhat[i][0] == 1.0
+        pt2_successful = abs(pt2_selected_zs[i] - cur_hs_z) < 1 if via_dist else e_pt2_yhat[i][0] == 1.0
         if enc_unsuccessful and pt2_successful:
             # Then we consider selection unsuccessful. Record data on wrongly chosen vertex and correct vertex
-            mistake_x.append(cur_x[vertex_num])
-            mistake_rec_x.append(e_rec_vecs[i][vertex_num])
-            event_nums.append(i + start_event_num)
-            vertex_nums.append(vertex_num)
-            correct_x.append(cur_x[0])
-            correct_rec_x.append(e_rec_vecs[i][0])
+            mistake_x.append(cur_x[vertex_num])  # input data for selected vertex
+            mistake_rec_x.append(e_rec_vecs[i][vertex_num])  # reconstructions for selected vertex
+            mistake_event_nums.append(cur_e_num)  # event number of event where the mistake occurred
+            vertex_nums.append(vertex_num)  # vertex number of the mistake
+            correct_x.append(cur_x[0])  # input data for the correct vertex
+            correct_rec_x.append(e_rec_vecs[i][0])  # reconstruction for the correct vertex
             print(f"{e_rec_errs[i][vertex_num]:<10.4f}{e_rec_errs[i][0]:<10.4f}{cur_enc_z:<10.4f}{hs_reco_zs[i]:<10.4f}{cur_hs_z:<10.4f}")
-            other_data.append([e_pt2[i][vertex_num], e_rec_errs[i][vertex_num], e_pt2[i][0], e_rec_errs[i][0], cur_enc_z, hs_reco_zs[i], hs_truth_zs[i], vertex_num, i+start_event_num])
+            other_data.append([e_pt2[i][vertex_num], e_rec_errs[i][vertex_num], e_pt2[i][0], e_rec_errs[i][0], cur_enc_z, hs_reco_zs[i], hs_truth_zs[i], vertex_num, cur_e_num])
 
-    mistake_data = np.column_stack((mistake_x, vertex_nums, event_nums))
-    correct_data = np.column_stack((correct_x, event_nums))
-    mistake_rec = np.column_stack((mistake_rec_x, vertex_nums, event_nums))
-    correct_rec = np.column_stack((correct_rec_x, event_nums))
+    mistake_data = np.column_stack((mistake_x, vertex_nums, mistake_event_nums))
+    correct_data = np.column_stack((correct_x, mistake_event_nums))
+    mistake_rec = np.column_stack((mistake_rec_x, vertex_nums, mistake_event_nums))
+    correct_rec = np.column_stack((correct_rec_x, mistake_event_nums))
 
-    np.savetxt(outfile_prefix + "_mistakes.csv", mistake_data, delimiter=",", fmt="%.5f")
-    np.savetxt(outfile_prefix + "_corrections.csv", correct_data, delimiter=",", fmt="%.5f")
-    np.savetxt(outfile_prefix + "_mistakes_rec.csv", mistake_rec, delimiter=",", fmt="%.5f")
-    np.savetxt(outfile_prefix + "_corrections_rec.csv", correct_rec, delimiter=",", fmt="%.5f")
+    np.savetxt(outfile_prefix + "_mistakes.csv", mistake_data, delimiter=",", fmt="%.4f")
+    np.savetxt(outfile_prefix + "_corrections.csv", correct_data, delimiter=",", fmt="%.4f")
+    np.savetxt(outfile_prefix + "_mistakes_rec.csv", mistake_rec, delimiter=",", fmt="%.4f")
+    np.savetxt(outfile_prefix + "_corrections_rec.csv", correct_rec, delimiter=",", fmt="%.4f")
 
     other_data = np.array(other_data)
     headers = "mistake pt2, rec err, coorect pt2, rec err, z,reco_z,truth_z,vert_#,event_#"
@@ -222,21 +226,8 @@ def gather_mistakes(algo_scores, x_data, y_data, reco_zs, hs_truth_zs, start_eve
     return np.array(mistake_x), np.array(correct_x)
 
 
-def run_diagnostic_harness(autoencoder: Autoencoder):
-    ttbar_train, ttbar_x, ttbar_y = load_train_test(FEAT_FOLDER + "/" + TTBAR_PT_FILE, TRAINING_BATCH_RANGE,
-                                                    TESTING_BATCH_RANGE)
-
-    # Load data for pt2
-    ttbar_pt2, _trash = load_data(PT2_FOLDER + "/" + TTBAR_SUM_PT2, TESTING_BATCH_RANGE)
-
-    # Load z-coordinate data
-    ttbar_reco_z, _trash = load_data(FEAT_FOLDER + "/" + TTBAR_Z_FILE, TESTING_BATCH_RANGE)
-    ttbar_hs_truth_z = load_truth_hs_z(file_paths.ROOT_PATH, TESTING_BATCH_RANGE[0] * BATCH_SIZE,
-                                       TESTING_BATCH_RANGE[1] * BATCH_SIZE)
-
-    model = autoencoder
-    # model.train_model(ttbar_train, epochs=30, plot_valid_loss=True)
-    model.load_weights("models/pt_massive_model.weights.h5")
+def run_diagnostic_harness(model_path):
+    model = keras.models.load_model(model_path)
 
     make_plots(model, ttbar_x, ttbar_y, ttbar_pt2, ttbar_reco_z, ttbar_hs_truth_z)
 
@@ -268,6 +259,99 @@ def run_diagnostic_harness(autoencoder: Autoencoder):
     # plot_two_axis_hist(wrong_vertex_n_tracks, correct_vertex_n_tracks, 20)
 
 
+def mistake_collector_wrapper(model_path):
+    model = Autoencoder(input_dim=50, code_dim=3, architecture=(17,), regularization="L2")
+    model.load_model(model_path)
+
+    # *** Loading Data ***
+    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper(
+        "data_batches/ttbar_big_7500e.csv",
+        "data_batches/ttbar_hs_truth_z.csv", 3500)
+    vbf_train, vbf_X, vbf_y, vbf_pt2, vbf_reco_zs, vbf_event_nums, vbf_hs_zs = data_loading_wrapper(
+        "data_batches/vbf_big_7500e.csv", "data_batches/vbf_hs_truth_z.csv", 3500)
+    print("Done Loading All Data")
+
+    # *** Gathering Mistakes made by Autoencoder but not by pt2 ***
+    gather_encoder_mistakes(model, ttbar_pt2, ttbar_X, ttbar_y, ttbar_reco_zs, ttbar_hs_zs, ttbar_event_nums,
+                            outfile_prefix="mistakes/final_model_mistakes/ttbar_pt_dist_", via_dist=True)
+    gather_encoder_mistakes(model, vbf_pt2, vbf_X, vbf_y, vbf_reco_zs, vbf_hs_zs, vbf_event_nums,
+                            outfile_prefix="mistakes/final_model_mistakes/vbf_pt_dist_", via_dist=True)
+
+
+def select_reconstruction_wrapper():
+    """
+    This selects subset of reconstructions for further analysis
+    :return:
+    """
+    # *** Loading Data ***
+    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper(
+        "data_batches/ttbar_big_7500e.csv",
+        "data_batches/ttbar_hs_truth_z.csv", 3500)
+    vbf_train, vbf_X, vbf_y, vbf_pt2, vbf_reco_zs, vbf_event_nums, vbf_hs_zs = data_loading_wrapper(
+        "data_batches/vbf_big_7500e.csv", "data_batches/vbf_hs_truth_z.csv", 3500)
+    print("Done Loading All Data")
+
+    # Combine data
+    X_data = np.vstack((ttbar_X, vbf_X))
+    y_data = np.concatenate((ttbar_y, vbf_y))
+    is_ttbar = np.concatenate((np.ones(len(ttbar_y)), np.zeros(len(vbf_y))))
+    event_nums = np.concatenate((ttbar_event_nums, vbf_event_nums))
+    all_data = np.column_stack((X_data, event_nums, is_ttbar, y_data))
+
+    # select data
+    hs_mask = y_data == 1
+    hs_data = all_data[hs_mask]
+    pu_data = all_data[~hs_mask]
+    pu_selected_idxs = np.random.choice(len(pu_data), 30000, replace=False)
+    pu_data = pu_data[pu_selected_idxs]
+
+    final_data = np.vstack((hs_data, pu_data))
+    header = "First 50 columns are pt, 51st is e#, 52ndis whether ttbar, 52nd is HS label"
+    np.savetxt("data_batches/select_vertices.csv", final_data, delimiter=",", fmt="%.3f", header=header)
+
+
+def load_selected_reconstructions_wrapper(model):
+    X, y_data = load_csv("data_batches/select_vertices.csv")
+    X_data = X[:, :50]
+    is_ttbar = X[:, 50].astype(bool)
+    y_data = y_data.astype(bool)
+    reconstructions = model.reconstructions(X_data)
+    return X_data, reconstructions, is_ttbar, y_data
+
+def reconstruction_collector_wrapper(model_path):
+    """
+    Use this to collect the reconstructions generated by the model
+    Makes some plots using these reconstructions
+    :return:
+    """
+    model = Autoencoder(input_dim=50, code_dim=3, architecture=(17,), regularization="L2")
+    model.load_model(model_path)
+    X_data, recs, is_tt, y_data = load_selected_reconstructions_wrapper(model)
+
+    # Calculate ratios
+    pt_n = 0
+    rec_ratios = recs[:, pt_n] / (recs[:, pt_n+1] + 0.001)
+    org_ratios = X_data[:, pt_n] / (X_data[:, pt_n+1] + 0.001)
+    validity_mask = (X_data[:, 0] > 0.5)  # non-existent validity mask
+
+    plot_two_axis_hist(rec_ratios, org_ratios, np.linspace(1, 5, 50), "REC", "ORG", "Pt0 / Pt1")
+
+    # tt_hs_rec_r = rec_ratios[is_tt & y_data & validity_mask]
+    # tt_hs_org_r = org_ratios[is_tt & y_data & validity_mask]
+    # tt_pu_rec_r = rec_ratios[is_tt & (~y_data) & validity_mask]
+    # tt_pu_org_r = org_ratios[is_tt & (~y_data) & validity_mask]
+    # vbf_hs_rec_r = rec_ratios[(~is_tt) & y_data & validity_mask]
+    # vbf_hs_org_r = org_ratios[(~is_tt) & y_data & validity_mask]
+    # vbf_pu_rec_r = rec_ratios[(~is_tt) & (~y_data) & validity_mask]
+    # vbf_pu_org_r = org_ratios[(~is_tt) & (~y_data) & validity_mask]
+    #
+    # # Plot
+    # plot_two_axis_hist(tt_pu_rec_r, tt_hs_rec_r, np.linspace(1, 2, 30), "PU", "HS", "TTBAR HS vs PU REC")
+    # # plot_two_axis_hist(tt_pu_org_r, tt_hs_org_r, np.linspace(0, 10, 30), "PU", "HS", "TTBAR HS vs PU ORG")
+    # plot_two_axis_hist(vbf_pu_rec_r, vbf_hs_rec_r, np.linspace(1, 2, 30), "PU", "HS", "VBF HS vs PU REC")
+    # # plot_two_axis_hist(vbf_pu_org_r, vbf_hs_org_r, np.linspace(0, 10, 30), "PU", "HS", "VBF HS vs PU ORG")
+
+
 def quick_test(autoencoder: Autoencoder):
     model = autoencoder
     x_test = np.array([[25.55088,2.12126,1.73985,1.67074,1.44958,1.40417,1.12832,1.08985,0.96332,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000,0.00000]])
@@ -277,5 +361,8 @@ def quick_test(autoencoder: Autoencoder):
 
 
 if __name__ == "__main__":
-    run_diagnostic_harness(Autoencoder(input_dim=50, code_dim=50, architecture=(50,), regularization=None))
+    # run_diagnostic_harness(Autoencoder(input_dim=50, code_dim=50, architecture=(50,), regularization=None))
     # quick_test(Autoencoder(input_dim=50, code_dim=3, architecture=(17,), regularization="L2"))
+    # mistake_collector_wrapper("models/final_pt_model.keras")
+    # reconstruction_collector_wrapper("models/final_pt_model.keras")
+    select_reconstruction_wrapper()

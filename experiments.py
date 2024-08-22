@@ -226,22 +226,23 @@ def data_loading_wrapper(feat_path, truth_hs_path, split_idx_num):
     Loads data to keep things in run_experiment() (de facto main function) clean
     :return:
     """
-    ttbar_data, ttbar_y = load_csv(feat_path)
-    ttbar_hs_z_data = load_truth_hs_z(truth_hs_path)
+    data, y = load_csv(feat_path)
+    hs_z_data = load_truth_hs_z(truth_hs_path)
     # Note: after here, ttbar y is only for testing data
-    ttbar_train_set, ttbar_test_set, ttbar_y, ttbar_hs_zs = train_test_split(ttbar_data, ttbar_y,
-                            split_idx_num=split_idx_num, remove_training_hs=True, truth_hs_data=ttbar_hs_z_data)
+    train_set, test_set, y, hs_zs = train_test_split(data, y,
+                            split_idx_num=split_idx_num, remove_training_hs=True, truth_hs_data=hs_z_data)
     # split into features
     pt_idxs = np.arange(0, 100, 2)
-    ttbar_train = ttbar_train_set[:, pt_idxs]
-    ttbar_X = ttbar_test_set[:, pt_idxs]
-    ttbar_reco_zs = ttbar_test_set[:, 100]
+    train = train_set[:, pt_idxs]
+    X = test_set[:, pt_idxs]
+    reco_zs = test_set[:, 100]
+    event_nums = test_set[:, 101].astype(int)
     # for now, we'll calculate pt2
-    ttbar_pt2 = np.sum(ttbar_X ** 2, axis=1)
+    pt2 = np.sum(X ** 2, axis=1)
     # Do sanity checks
-    sanity_checks(ttbar_y, ttbar_hs_zs)
+    sanity_checks(y, hs_zs)
 
-    return ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_hs_zs
+    return train, X, y, pt2, reco_zs, event_nums, hs_zs
 
 
 def sanity_checks(y, hs_zs):
@@ -289,16 +290,17 @@ def run_experiment():
     :return:
     """
     # *** Loading Data ***
-    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_hs_zs = data_loading_wrapper("data_batches/ttbar_big_7500e.csv",
+    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper("data_batches/ttbar_big_7500e.csv",
                                                                                                 "data_batches/ttbar_hs_truth_z.csv", 3500)
-    vbf_train, vbf_X, vbf_y, vbf_pt2, vbf_reco_zs, vbf_hs_zs = data_loading_wrapper(
+    vbf_train, vbf_X, vbf_y, vbf_pt2, vbf_reco_zs, vbf_event_nums, vbf_hs_zs = data_loading_wrapper(
         "data_batches/vbf_big_7500e.csv", "data_batches/vbf_hs_truth_z.csv", 3500)
     X_train = np.vstack((ttbar_train, vbf_train))
 
     # *** Training / saving / loading model, then doing inference ***
-    model = Autoencoder(input_dim=50, code_dim=3, architecture=(17,), regularization="L2")
+    model = Autoencoder(input_dim=50, code_dim=5, architecture=(32,8), regularization="L2")
     model.train_model(X_train, epochs=10, plot_valid_loss=False)
-    model.save_model("models/final_pt_model.keras")
+    # model.save_model("models/final_pt_model.keras")
+    # model.load_model("models/final_pt_model.keras")
     ttbar_errs = model.reconstruction_error(ttbar_X)
     vbf_errs = model.reconstruction_error(vbf_X)
 
