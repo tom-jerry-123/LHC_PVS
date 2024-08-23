@@ -112,3 +112,19 @@ def event_partition(y_data, *args):
     return return_data_lst
 
 
+def shuffle_data(x_data, *args):
+    """
+    Shuffles the data passed here. accepts additional args as necessary.
+    Assumes all input arrays have same length
+    :param x_data: numpy array of data
+    :param args:
+    :return:
+    """
+    permute_idxs = np.random.choice(len(x_data), len(x_data), replace=False)
+    x_data = x_data[permute_idxs]
+    ret_data_lst = [x_data]
+    for i, data_arr in enumerate(args):
+        ret_data_lst.append(data_arr[permute_idxs])
+    return ret_data_lst
+
+
