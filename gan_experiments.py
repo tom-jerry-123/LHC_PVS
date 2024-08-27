@@ -5,6 +5,8 @@ import keras
 from autoencoder import Autoencoder
 from diagnostic import load_selected_reconstructions_wrapper
 from helpers import shuffle_data
+from experiments import data_loading_wrapper
+from gan_network import GanAutoencoder
 
 
 def discriminator_experiment():
@@ -51,5 +53,14 @@ def discriminator_experiment():
     print(np.sum(D_y_test))
 
 
+def gan_test():
+    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper(
+        "data_batches/ttbar_small_500e.csv",
+        "data_batches/ttbar_hs_truth_z.csv", 300)
+
+    model = GanAutoencoder(input_dim=50, latent_dim=3)
+    model.train(ttbar_train, epochs=10, batch_size=256)
+
+
 if __name__ == "__main__":
-    discriminator_experiment()
+    gan_test()
