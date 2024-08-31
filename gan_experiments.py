@@ -2,11 +2,13 @@
 
 import numpy as np
 import keras
+
+import gan_network
 from autoencoder import Autoencoder
 from diagnostic import load_selected_reconstructions_wrapper
 from helpers import shuffle_data
-from experiments import data_loading_wrapper
-from gan_network import GanAutoencoder
+from experiments import data_loading_wrapper, evaluate_results
+from gan_network import GanNetwork
 
 
 def discriminator_experiment():
@@ -49,18 +51,49 @@ def discriminator_experiment():
         batch_size=64,
         validation_split=0.2  # Use 20% of training data for validation
     )
+
+    print("\n\n*** Evaluating Critic Network ***\n")
     discriminator.evaluate(D_X_test, D_y_test)
     print(np.sum(D_y_test))
 
 
-def gan_test():
+def quick_gan_test():
     ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper(
         "data_batches/ttbar_small_500e.csv",
         "data_batches/ttbar_hs_truth_z.csv", 300)
 
-    model = GanAutoencoder(input_dim=50, latent_dim=3)
-    model.train(ttbar_train, epochs=10, batch_size=256)
+    model = GanNetwork(input_dim=50, latent_dim=5)
+    model.compile(keras.optimizers.Adam(1e-4), keras.optimizers.Adam(1e-4))
+    model.fit(ttbar_train, ttbar_train, epochs=10, batch_size=256)
+
+    rec_errs = model.get_reconstruction_errors(ttbar_X)
+    print(rec_errs)
+
+
+def run_gan_experiment():
+    # *** Loading Data ***
+    ttbar_train, ttbar_X, ttbar_y, ttbar_pt2, ttbar_reco_zs, ttbar_event_nums, ttbar_hs_zs = data_loading_wrapper(
+        "data_batches/ttbar_big_7500e.csv",
+        "data_batches/ttbar_hs_truth_z.csv", 3500)
+    vbf_train, vbf_X, vbf_y, vbf_pt2, vbf_reco_zs, vbf_event_nums, vbf_hs_zs = data_loading_wrapper(
+        "data_batches/vbf_big_7500e.csv", "data_batches/vbf_hs_truth_z.csv", 3500)
+    X_train = np.vstack((ttbar_train, vbf_train))
+
+    # *** Training / saving / loading model, then doing inference ***
+    # model = GanNetwork(input_dim=50, latent_dim=5)
+    # model.compile(d_optimizer=keras.optimizers.Adam(1e-4), a_optimizer=keras.optimizers.Adam(1e-4))
+    # model.fit(X_train, X_train, epochs=20, batch_size=256)
+    # model.save_model("models/gan_full_5d_code")
+    model = GanNetwork.load_model("models/gan_full_5d_code")
+    ttbar_scores = model.get_discriminator_predictions(ttbar_X)
+    vbf_scores = model.get_discriminator_predictions(vbf_X)
+
+    # *** Evaluating Model ***
+    evaluate_results(ttbar_pt2, ttbar_scores, ttbar_y, ttbar_reco_zs, ttbar_hs_zs, model_name="Critic",
+                     dataset_name="TTBAR")
+    evaluate_results(vbf_pt2, vbf_scores, vbf_y, vbf_reco_zs, vbf_hs_zs, model_name="Critic", dataset_name="VBF")
 
 
 if __name__ == "__main__":
-    gan_test()
+    # run_gan_experiment()
+    discriminator_experiment()
